@@ -1,0 +1,13 @@
+:root{
+  --bg:#ffffff;
+  --text:#0b0b0c;
+  --muted:#9aa1ac;
+  --line:#eceff3;
+  --accent:#111827;
+  --accent-contrast:#ffffff;
+  --hover:#f7f8fa;
+  --today:#6366f1;
+
+  --radius:16px;
+  --shadow-lg:0 10px 30px rgba(0,0,0,.15);
+}

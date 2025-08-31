@@ -1,0 +1,32 @@
+const express = require('express');
+const router = express.Router();
+const passport = require('passport');
+const jwt = require('jsonwebtoken');
+const authController = require('../controllers/authController');
+
+const FRONTEND_APP_URL   = process.env.FRONTEND_APP_URL   || 'http://localhost:5173';
+const FRONTEND_LOGIN_URL = process.env.FRONTEND_LOGIN_URL || `${FRONTEND_APP_URL}/login`;
+
+console.log('[authRoutes] loaded');
+
+// Debug: xác nhận router đang mount
+router.get('/_debug', (req, res) => res.json({ ok: true, at: '/api/auth/_debug' }));
+
+router.post('/register', authController.register);
+router.post('/login',    authController.login);
+
+console.log('[authRoutes] registering GET /google');
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { failureRedirect: FRONTEND_LOGIN_URL, session: false }),
+  (req, res) => {
+    const user = req.user;
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const userResponse = JSON.stringify({ id: user.id, name: user.name, email: user.email });
+    res.redirect(`${FRONTEND_APP_URL}?token=${encodeURIComponent(token)}&user=${encodeURIComponent(userResponse)}`);
+  }
+);
+
+module.exports = router;
