@@ -398,9 +398,12 @@ function AppShell() {
 
       {/* ✅ dùng openTaskDetail để truyền cả payload + data */}
       <CalendarGrid days={days} onOpenDetail={openTaskDetail} />
-      <SomedaySection onOpenTask={openTaskDetail} 
-      registerApi={(api) => { somedayApiRef.current = api; }}
-      />
+      <SomedaySection
+           onOpenTask={openTaskDetail}
+           registerApi={(api) => { somedayApiRef.current = api; }}
+           authed={authed}
+          activeCalendarId={activeCalendarId}
+       />
 
       {isSearchOpen && (
         <SearchModal
