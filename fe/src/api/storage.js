@@ -1,48 +1,56 @@
-// src/api/storage.js
-const TOKEN_KEY = 'token';
-
-function getToken() {
-  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
-}
-
-function setToken(t) {
-  try {
-    if (t == null) localStorage.removeItem(TOKEN_KEY);
-    else localStorage.setItem(TOKEN_KEY, t);
-    window.dispatchEvent(new Event('authChange'));
-  } catch {}
-}
-
-function clearToken() {
-  setToken(null);
-}
-
-const keys = {
-  tasks: (calendarId) => `tasks:${calendarId}`,
+// fe/src/api/storage.js
+export const KEYS = {
+  token: 'auth_token',
+  user: 'auth_user',
+  activeCal: 'active_calendar_id',
 };
 
-function readJSON(key, fallback = null) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
+// ===== Token =====
+export function getToken() {
+  try { return localStorage.getItem(KEYS.token) || null; } catch { return null; }
 }
-
-function writeJSON(key, value) {
+export function setToken(token) {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    if (token) localStorage.setItem(KEYS.token, token);
+    else localStorage.removeItem(KEYS.token);
   } catch {}
+  window.dispatchEvent(new Event('authChange'));
 }
 
+// ===== User =====
+export function getUser() {
+  try {
+    const raw = localStorage.getItem(KEYS.user);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+export function setUser(user) {
+  try {
+    if (user) localStorage.setItem(KEYS.user, JSON.stringify(user));
+    else localStorage.removeItem(KEYS.user);
+  } catch {}
+  window.dispatchEvent(new Event('authChange'));
+}
+
+// ===== Active Calendar =====
+export function getActiveCalendarId() {
+  try { return localStorage.getItem(KEYS.activeCal) || null; } catch { return null; }
+}
+export function setActiveCalendarId(id) {
+  try {
+    if (id) localStorage.setItem(KEYS.activeCal, String(id));
+    else localStorage.removeItem(KEYS.activeCal);
+  } catch {}
+  window.dispatchEvent(new Event('activeCalendarChanged'));
+}
+
+// ✅ Gom lại để có thể gọi API.storage.getToken()
 export const storage = {
+  KEYS,
   getToken,
   setToken,
-  clearToken,
-  keys,
-  readJSON,
-  writeJSON,
+  getUser,
+  setUser,
+  getActiveCalendarId,
+  setActiveCalendarId,
 };
-
-export { getToken, setToken, clearToken, keys, readJSON, writeJSON };

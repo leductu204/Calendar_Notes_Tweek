@@ -1,9 +1,10 @@
+// be/server.js
 require('dotenv').config();
 const express  = require('express');
 const cors     = require('cors');
 const helmet   = require('helmet');
 
-require('./src/config/passport');             
+require('./src/config/passport');
 const passport = require('passport');
 
 const authRoutes     = require('./src/routes/authRoutes');
@@ -12,14 +13,12 @@ const somedayRoutes  = require('./src/routes/somedayRoutes');
 const taskRoutes     = require('./src/routes/taskRoutes');
 const shareRoutes    = require('./src/routes/shareRoutes');
 
-const notFound     = require('./src/middleware/notFound');
-const errorHandler = require('./src/middleware/errorHandler');
+const notFound       = require('./src/middleware/notFound');
+const errorHandler   = require('./src/middleware/errorHandler');
+const authMiddleware = require('./src/middleware/authMiddleware');
+const ensureCalendar = require('./src/middleware/ensureCalendar');
 
 const app = express();
-
-console.log('[server] PID =', process.pid);
-console.log('[server] CWD =', process.cwd());
-console.log('[server] __dirname =', __dirname);
 
 app.use((req, res, next) => {
   console.log('[hit]', req.method, req.url);
@@ -29,25 +28,26 @@ app.use((req, res, next) => {
 app.use(helmet());
 app.use(cors({
   origin: process.env.FRONTEND_APP_URL || 'http://localhost:5173',
+  methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','X-Calendar-Id'],
+  credentials: false,
 }));
 app.use(express.json());
 app.use(passport.initialize());
 
 app.get('/healthz', (req, res) => res.json({ ok: true }));
 
-console.log('[server] mount /api/auth');
+// Public: auth
 app.use('/api/auth', authRoutes);
 
-console.log('[server] mount /api/calendars');
-app.use('/api/calendars', calendarRoutes);
+// Private: calendars
+app.use('/api/calendars', authMiddleware, calendarRoutes);
 
-console.log('[server] mount /api/someday');
-app.use('/api/someday', somedayRoutes);
+// Private + cần calendarId
+app.use('/api/tasks',   authMiddleware, ensureCalendar, taskRoutes);
+app.use('/api/someday', authMiddleware, ensureCalendar, somedayRoutes);
 
-console.log('[server] mount /api/tasks');
-app.use('/api/tasks', taskRoutes);
-
-console.log('[server] mount /s');
+// Public: share links
 app.use('/s', shareRoutes);
 
 app.use(notFound);

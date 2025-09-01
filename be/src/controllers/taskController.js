@@ -1,9 +1,9 @@
-// D:\ghichu\be\src\controllers\taskController.js
+// BE: be/src/controllers/taskController.js
 const db = require('../config/db');
 
 exports.listByRange = async (req, res, next) => {
   try {
-    const calId = req.calendarId;                   // set bởi ensureCalendar
+    const calId = req.calendarId;
     const { from, to } = req.query;
     if (!from || !to) return res.status(400).json({ message: 'from/to là bắt buộc (YYYY-MM-DD)' });
 
@@ -53,13 +53,11 @@ exports.update = async (req, res, next) => {
     const id = Number(req.params.id);
     const calId = req.calendarId;
 
-    // move: đổi due_date ⇄ someday_column_id
     const {
       text, notes, is_done, color, subtasks, attachments, repeat_info, reminder_info, links,
       due_date, someday_column_id
     } = req.body;
 
-    // nếu move sang ngày -> cần display_order mới
     let patchOrder = '';
     let params = [calId, id];
     let set = [];
@@ -81,9 +79,7 @@ exports.update = async (req, res, next) => {
     add('links', links);
 
     if (due_date !== undefined || someday_column_id !== undefined) {
-      // xác định target
       if (due_date) {
-        // move sang ngày -> clear column + tính display_order
         const { rows: m } = await db.query(
           'SELECT COALESCE(MAX(display_order), -1)+1 AS next FROM tasks WHERE calendar_id=$1 AND due_date=$2',
           [calId, due_date]
@@ -95,7 +91,6 @@ exports.update = async (req, res, next) => {
         set.push(`someday_column_id=$${params.length + 1}`);
         params.push(Number(someday_column_id));
         patchOrder = ', due_date=NULL';
-        // display_order khi về column:
         const { rows: m2 } = await db.query(
           'SELECT COALESCE(MAX(display_order), -1)+1 AS next FROM tasks WHERE someday_column_id=$1',
           [Number(someday_column_id)]

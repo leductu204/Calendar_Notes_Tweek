@@ -1,17 +1,15 @@
-// D:\ghichu\be\src\controllers\somedayController.js
+// BE: be/src/controllers/somedayController.js
 const db = require('../config/db');
 
 exports.getBoard = async (req, res, next) => {
   try {
     const calId = req.calendarId;
 
-    // lấy cột
     let cols = (await db.query(
       'SELECT id, title, display_order FROM someday_columns WHERE calendar_id=$1 ORDER BY display_order, id',
       [calId]
     )).rows;
 
-    // nếu chưa có -> tạo 3 cột mặc định rồi lấy lại
     if (!cols || cols.length === 0) {
       await db.query(
         `INSERT INTO someday_columns (calendar_id, title, display_order)
@@ -24,7 +22,6 @@ exports.getBoard = async (req, res, next) => {
       )).rows;
     }
 
-    // lấy task thuộc các cột someday
     const tasks = (await db.query(
       `SELECT id, someday_column_id, display_order, text, notes, is_done, color,
               subtasks, attachments, repeat_info, reminder_info, links
@@ -34,7 +31,6 @@ exports.getBoard = async (req, res, next) => {
       [calId]
     )).rows;
 
-    // gộp theo cột
     const map = {};
     cols.forEach(c => (map[c.id] = { id: c.id, title: c.title || '', tasks: [] }));
     tasks.forEach(t => { if (map[t.someday_column_id]) map[t.someday_column_id].tasks.push(t); });

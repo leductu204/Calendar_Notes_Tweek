@@ -1,4 +1,4 @@
-// src/components/modals/TaskModal.jsx
+// FE: fe/src/components/modals/TaskModal.jsx
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import "../../styles/task.css";
 
@@ -10,6 +10,7 @@ import SharePopover from "./popovers/SharePopover.jsx";
 import AttachmentItem from "./items/AttachmentItem.jsx";
 import SubtaskItem from "./items/SubtaskItem.jsx";
 
+/* ===== Icons ===== */
 const IcoTrash = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
     <path d="M3 6h18M9 6V4h6v2m-8 0l1 14h8l1-14" />
@@ -63,6 +64,7 @@ const IcoBlockquote = () => (
   </svg>
 );
 
+/* ===== Helpers ===== */
 function fmtDateVN(d) {
   if (!d) return "";
   const dt = new Date(d);
@@ -70,6 +72,7 @@ function fmtDateVN(d) {
   return `${dow}, ${dt.getDate()}/${dt.getMonth() + 1}/${dt.getFullYear()}`;
 }
 
+/* contentEditable helpers */
 function placeCaretAtBlock(block, atEnd = true) {
   if (!block) return;
   const r = document.createRange();
@@ -110,6 +113,7 @@ function getOrCreateCurrentBlock(host, focusHost = true) {
   return node && node !== host ? node : host.querySelector("p,div,li");
 }
 
+/* Popover layer */
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 function PopLayer({ anchor, onClose, children }) {
   const ref = React.useRef(null);
@@ -145,42 +149,48 @@ function PopLayer({ anchor, onClose, children }) {
 }
 
 export default function TaskModal({
-  isOpen, task, onClose, onUpdate, onDelete,
-  onMoveToTomorrow, onMoveToNextWeek, onMoveToSomeday, onDuplicate,
+  isOpen,
+  task,
+  onClose,
+  onUpdate,
+  onDelete,
+  onMoveToTomorrow,
+  onMoveToNextWeek,
+  onMoveToSomeday,
+  onDuplicate,
+  onAddAttachment,
   isSomeday
 }) {
   const notesEl = useRef(null);
-  const currentTask = task || {};
-  const {
-    title = currentTask.text || "",
-    notes = "",
-    color = "",
-    date = new Date(),
-    done = false,
-    subtasks = [],
-    attachments = [],
-    repeat = { type: "never" },
-    reminder = null,
-    links: initLinks = []
-  } = currentTask;
+  const t = task || {};
 
-  // 🔁 ưu tiên repeat_info, fallback repeat → never
-  const repeatValue = currentTask.repeat_info || repeat || { type: "never" };
+  /* ===== ÉP KIỂU AN TOÀN ===== */
+  const subtasksArr = Array.isArray(t.subtasks)
+    ? t.subtasks
+    : (t.subtasks && typeof t.subtasks === "object" ? Object.values(t.subtasks) : []);
+  const attachmentsArr = Array.isArray(t.attachments) ? t.attachments : [];
+  const linksArr = Array.isArray(t.links) ? t.links : [];
 
+  // toolbar
   const [hOn, setHOn] = useState(false);
   const [bOn, setBOn] = useState(false);
   const [quoteOn, setQuoteOn] = useState(false);
   const [bulletOn, setBulletOn] = useState(false);
 
-  const [localLinks, setLocalLinks] = useState(initLinks || []);
-  const [linkOpen, setLinkOpen] = useState((initLinks || []).length > 0);
+  // links panel
+  const [localLinks, setLocalLinks] = useState(linksArr);
+  const [linkOpen, setLinkOpen] = useState(linksArr.length > 0);
   const [isAddingLink, setIsAddingLink] = useState(false);
   const [linkVal, setLinkVal] = useState("");
 
+  // subtasks adder
   const [adderText, setAdderText] = useState("");
+
+  // popovers
   const [openPop, setOpenPop] = useState(null);
   const [anchor, setAnchor] = useState({ top: 0, left: 0 });
 
+  /* Effects */
   useEffect(() => {
     if (isOpen) document.body.classList.add("modal-open");
     else document.body.classList.remove("modal-open");
@@ -191,28 +201,22 @@ export default function TaskModal({
     if (!isOpen) return;
     const el = notesEl.current; if (!el) return;
 
+    const notes = t.notes || "";
     if (notes && !/<[a-z]/i.test(notes)) el.textContent = notes;
     else el.innerHTML = notes || "";
-
     if (!notes || notes.trim() === "") ensureHostHasBlock(el);
 
     const plain = (el.innerText || "").replace(/\u200B/g, "").trim();
     el.dataset.hastext = plain ? "1" : "";
 
-    const safeLinks = Array.isArray(initLinks) ? initLinks : [];
+    const safeLinks = linksArr;
     setLocalLinks(safeLinks);
     setLinkOpen(safeLinks.length > 0);
     setIsAddingLink(false);
     setLinkVal("");
     setOpenPop(null);
-  }, [isOpen, currentTask?.id]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e) => { if (e.key === "Escape") handleClose(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [isOpen, linkVal, localLinks]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, t?.id]); // reset khi mở task khác
 
   useEffect(() => {
     if (!isOpen) return;
@@ -229,6 +233,7 @@ export default function TaskModal({
 
   if (!isOpen) return null;
 
+  /* helpers */
   const openAt = (e, key) => {
     const b = e.currentTarget.getBoundingClientRect();
     setAnchor({ top: b.bottom + 8, left: b.left + b.width / 2 });
@@ -236,8 +241,7 @@ export default function TaskModal({
   };
 
   const syncNotes = () => {
-    const el = notesEl.current;
-    if (!el) return;
+    const el = notesEl.current; if (!el) return;
     onUpdate?.({ notes: el.innerHTML || "" });
     const plain = (el.innerText || "").replace(/\u200B/g, "").trim();
     el.dataset.hastext = plain ? "1" : "";
@@ -249,21 +253,17 @@ export default function TaskModal({
     setHOn(blk.classList.contains("hline"));
     syncNotes();
   };
-
   const toggleBold = () => {
-    const host = notesEl.current;
-    host?.focus();
+    const host = notesEl.current; host?.focus();
     document.execCommand("bold");
     try { setBOn(document.queryCommandState("bold")); } catch {}
     syncNotes();
   };
-
   const toggleQuote = () => {
     const host = notesEl.current;
     const blk = getOrCreateCurrentBlock(host, true); if (!blk) return;
-
-    const willTurnOn = !blk.classList.contains("quote-line");
-    if (willTurnOn) {
+    const willOn = !blk.classList.contains("quote-line");
+    if (willOn) {
       if (blk.tagName === "LI") document.execCommand("insertUnorderedList");
       blk.classList.add("quote-line");
     } else {
@@ -274,7 +274,6 @@ export default function TaskModal({
     setBulletOn(!!cur && cur.tagName === "LI");
     syncNotes();
   };
-
   const toggleBullet = () => {
     const host = notesEl.current; host?.focus();
     const blkBefore = getOrCreateCurrentBlock(host, false);
@@ -288,18 +287,16 @@ export default function TaskModal({
     syncNotes();
   };
 
-  const handleKeyDown = (e) => {
+  const handleNotesKeyDown = (e) => {
     if (e.key !== "Enter") return;
     const el = notesEl.current; if (!el) return;
     const blk = getOrCreateCurrentBlock(el, false); if (!blk) return;
-
-    const isLastBlock = blk === Array.from(el.querySelectorAll("p,div,li")).pop();
+    const isLast = blk === Array.from(el.querySelectorAll("p,div,li")).pop();
     const carryH = blk.classList.contains("hline");
     const carryQ = blk.classList.contains("quote-line");
-
     setTimeout(() => {
       const nb = getOrCreateCurrentBlock(el, false); if (!nb) return;
-      if (isLastBlock) {
+      if (isLast) {
         if (carryH) nb.classList.add("hline");
         if (carryQ) nb.classList.add("quote-line");
       }
@@ -315,9 +312,9 @@ export default function TaskModal({
 
   const toggleLinkPanel = (e) => {
     e?.preventDefault(); e?.stopPropagation();
-    setLinkOpen((wasOpen) => {
-      if (!wasOpen) { setIsAddingLink(true); return true; }
-      setIsAddingLink((prev) => !prev);
+    setLinkOpen((was) => {
+      if (!was) { setIsAddingLink(true); return true; }
+      setIsAddingLink((p) => !p);
       return true;
     });
   };
@@ -327,14 +324,12 @@ export default function TaskModal({
     const url = normalizeUrl(linkVal);
     if (!url) return;
     if ((localLinks || []).includes(url)) { setLinkVal(""); setIsAddingLink(false); return; }
-
     const next = [...(localLinks || []), url];
     setLocalLinks(next);
     onUpdate?.({ links: next });
     setLinkVal("");
     setIsAddingLink(false);
   };
-
   const removeLink = (idx, e) => {
     e?.preventDefault(); e?.stopPropagation();
     const next = (localLinks || []).filter((_, i) => i !== idx);
@@ -345,7 +340,6 @@ export default function TaskModal({
   const handleClose = () => {
     const patch = {};
     if (notesEl.current) patch.notes = notesEl.current.innerHTML || "";
-
     let nextLinks = localLinks;
     const pending = (linkVal || "").trim();
     if (pending) {
@@ -354,7 +348,6 @@ export default function TaskModal({
       setLocalLinks(nextLinks);
     }
     patch.links = nextLinks;
-
     onUpdate?.(patch);
     setIsAddingLink(false);
     setLinkVal("");
@@ -362,87 +355,102 @@ export default function TaskModal({
     onClose?.();
   };
 
-  const handleToggleDoneAndClose = () => { onUpdate?.({ done: !done }); handleClose(); };
+  const handleToggleDoneAndClose = () => {
+    const next = !(t.done ?? t.is_done);
+    onUpdate?.({ done: next, is_done: next });
+    handleClose();
+  };
 
+  /* Subtasks */
   const handleAddSubtask = () => {
     const text = adderText.trim(); if (!text) return;
     const id = `sub_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
     onUpdate?.({
-      subtasks: [
-        ...(subtasks || []),
-        { id, text, done: false, starred: false, heading: false, indent: 0 }
-      ]
+      subtasks: [...subtasksArr, { id, text, done: false, starred: false, heading: false, indent: 0 }]
     });
     setAdderText("");
   };
-
   const updateSubtask = (id, idx, patch) => {
-    onUpdate?.({
-      subtasks: (subtasks || []).map((s, i) => {
-        const match = (s?.id != null) ? (s.id === id) : (i === idx);
-        return match ? { ...s, ...patch } : s;
-      })
+    const next = subtasksArr.map((s, i) => {
+      const match = (s?.id != null) ? (s.id === id) : (i === idx);
+      return match ? { ...s, ...(patch || {}) } : s;
     });
+    onUpdate?.({ subtasks: next });
   };
   const deleteSubtask = (id, idx) => {
-    onUpdate?.({
-      subtasks: (subtasks || []).filter((s, i) => {
-        const match = (s?.id != null) ? (s.id === id) : (i === idx);
-        return !match;
-      })
+    const next = subtasksArr.filter((s, i) => {
+      const match = (s?.id != null) ? (s.id === id) : (i === idx);
+      return !match;
     });
+    onUpdate?.({ subtasks: next });
   };
 
+  /* Attachments */
   const addAttachment = (file) => {
     const url = URL.createObjectURL(file);
     const meta = { id: Date.now(), name: file.name, size: file.size, type: file.type, url };
-    onUpdate?.({ attachments: [...(attachments || []), meta] });
+    onUpdate?.({ attachments: [...attachmentsArr, meta] });
+    onAddAttachment?.([file]);
   };
   const removeAttachment = (id) => {
-    onUpdate?.({ attachments: (attachments || []).filter((a) => a.id !== id) });
+    onUpdate?.({ attachments: attachmentsArr.filter((a) => a.id !== id) });
   };
 
+  /* Render */
   return (
     <div
       className="modal-overlay task-overlay"
       onMouseDown={handleClose}
-      style={{
-        background: "var(--overlay-bg, rgba(0,0,0,.35))",
-        backdropFilter: "blur(1px)"
-      }}
+      style={{ background: "var(--overlay-bg, rgba(0,0,0,.35))", backdropFilter: "blur(1px)" }}
     >
       <div className="task-modal" onMouseDown={(e) => e.stopPropagation()}>
+        {/* Header */}
         <div className="task-modal__head">
           {!isSomeday && (
             <button className="date-btn" onClick={(e) => openAt(e, "date")} title="Chọn ngày">
-              <span className="date-ic"><IcoCalendar /></span>{fmtDateVN(date)}
+              <span className="date-ic"><IcoCalendar /></span>{fmtDateVN(t.date)}
             </button>
           )}
           <div className="head-icons" style={{ marginLeft: 'auto' }}>
             <button className="ico" title="Xoá" onClick={onDelete}><IcoTrash /></button>
-            {!isSomeday && <button className="ico" title="Lặp lại" onClick={(e) => openAt(e, "repeat")}><IcoRepeat /></button>}
-            <button className={`ico-color ${color ? "has-color" : ""}`} title="Màu" onClick={(e) => openAt(e, "color")} style={color ? { "--swatch": color } : {}}><span className="sw" /></button>
+            {!isSomeday && (
+              <button className="ico" title="Lặp lại" onClick={(e) => openAt(e, "repeat")}><IcoRepeat /></button>
+            )}
+            <button
+              className={`ico-color ${t.color ? "has-color" : ""}`}
+              title="Màu"
+              onClick={(e) => openAt(e, "color")}
+              style={t.color ? { "--swatch": t.color } : {}}
+            >
+              <span className="sw" />
+            </button>
             <button className="ico" title="Nhắc nhở" onClick={(e) => openAt(e, "reminder")}><IcoBell /></button>
             <button className="ico" title="Chia sẻ" onClick={(e) => openAt(e, "share")}><IcoShare /></button>
             <button className="ico" title="Thêm tuỳ chọn" onClick={(e) => openAt(e, "kebab")}><IcoMore /></button>
           </div>
         </div>
 
+        {/* Title */}
         <div className="title-wrapper">
           <input
             autoFocus
             className="task-title-input"
-            value={title}
-            onChange={(e) => onUpdate?.({ text: e.target.value, title: e.target.value })}
+            value={t.text || ""}
+            onChange={(e) => onUpdate?.({ text: e.target.value })}
             placeholder="Tiêu đề công việc"
           />
-          <button className={`title-check-btn ${done ? 'is-done' : ''}`} title="Đánh dấu hoàn thành" onClick={handleToggleDoneAndClose}>
+          <button
+            className={`title-check-btn ${(t.done ?? t.is_done) ? 'is-done' : ''}`}
+            title="Đánh dấu hoàn thành"
+            onClick={handleToggleDoneAndClose}
+          >
             <IcoCheck />
           </button>
         </div>
 
         <div className="rule-strong" />
 
+        {/* Notes toolbar */}
         <div className="notes-toolbar">
           <button className={`tb ${hOn ? "on" : ""}`} title="Tiêu đề (phóng to + đậm)" onClick={toggleH}>H</button>
           <button className={`tb ${bOn ? "on" : ""}`} title="In đậm" onClick={toggleBold}>B</button>
@@ -451,6 +459,7 @@ export default function TaskModal({
           <button className="tb" title="Mở/đóng & hiển thị ô chèn" onClick={toggleLinkPanel}>🔗</button>
         </div>
 
+        {/* Links panel */}
         {linkOpen && (
           <div className="links-panel" style={{ marginTop: 8, display: "grid", gap: 8 }} onMouseDown={(e)=>e.stopPropagation()}>
             {(localLinks || []).map((u, idx) => (
@@ -537,6 +546,7 @@ export default function TaskModal({
           </div>
         )}
 
+        {/* Notes area */}
         <div
           ref={notesEl}
           className="task-notes"
@@ -551,19 +561,19 @@ export default function TaskModal({
             document.execCommand("insertText", false, text);
           }}
           onFocus={() => ensureHostHasBlock(notesEl.current)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={handleNotesKeyDown}
         />
 
-        {/* ===== Subtasks ===== */}
+        {/* Subtasks */}
         <div className="subtasks">
-          {(subtasks || []).map((s, idx) => {
+          {subtasksArr.map((s, idx) => {
             const safe = {
-              id: s.id ?? undefined,
-              text: s.text ?? "",
-              done: !!s.done,
-              starred: !!s.starred,
-              heading: !!s.heading,
-              indent: Number.isFinite(s.indent) ? s.indent : 0,
+              id: s?.id ?? undefined,
+              text: s?.text ?? "",
+              done: !!s?.done,
+              starred: !!s?.starred,
+              heading: !!s?.heading,
+              indent: Number.isFinite(s?.indent) ? s.indent : 0,
             };
             const key = safe.id != null ? `id-${safe.id}` : `idx-${idx}`;
             return (
@@ -600,41 +610,29 @@ export default function TaskModal({
           </div>
         </div>
 
-        {(attachments || []).length > 0 && (
+        {attachmentsArr.length > 0 && (
           <div style={{ marginTop: 10 }}>
-            {attachments.map((a) => (
+            {attachmentsArr.map((a) => (
               <AttachmentItem key={a.id} file={a} onDelete={() => removeAttachment(a.id)} />
             ))}
           </div>
         )}
 
-        {/* ===== Popovers ===== */}
-        {openPop === "date" && (
+        {/* Popovers */}
+        {openPop === "date" && !isSomeday && (
           <PopLayer anchor={anchor} onClose={() => setOpenPop(null)}>
             <DatePickerPopover
-              value={date}
-              onPick={(d) => {
-                if (typeof onChangeDate === "function") onChangeDate(d, "all");
-                else onUpdate?.({ date: d });
-                setOpenPop(null);
-              }}
+              value={t.date}
+              onPick={(d) => { onUpdate?.({ date: d }); setOpenPop(null); }}
             />
           </PopLayer>
         )}
 
-        {openPop === "repeat" && (
+        {openPop === "repeat" && !isSomeday && (
           <PopLayer anchor={anchor} onClose={() => setOpenPop(null)}>
             <RepeatPopover
-              value={repeatValue}
-              onChange={(payload) => {
-                const rule = payload?.rule || payload?.repeat || payload?.repeat_info || { type: "never" };
-                   if (typeof onChangeRepeat === "function") {
-                    onChangeRepeat(rule);
-                      } else {
-                        onUpdate?.({ repeat: rule, repeat_info: rule });
-                         }
-                setOpenPop(null);
-              }}
+              value={t.repeat_info || t.repeat || { type: "never" }}
+              onChange={({ rule }) => { onUpdate?.({ repeat: rule }); setOpenPop(null); }}
               onClose={() => setOpenPop(null)}
             />
           </PopLayer>
@@ -643,8 +641,8 @@ export default function TaskModal({
         {openPop === "reminder" && (
           <PopLayer anchor={anchor} onClose={() => setOpenPop(null)}>
             <ReminderPopover
-              date={date}
-              value={reminder}
+              date={t.date}
+              value={t.reminder_info || t.reminder}
               onSet={(val) => onUpdate?.({ reminder: val })}
               onDelete={() => onUpdate?.({ reminder: null })}
               onClose={() => setOpenPop(null)}
@@ -655,7 +653,7 @@ export default function TaskModal({
         {openPop === "color" && (
           <PopLayer anchor={anchor} onClose={() => setOpenPop(null)}>
             <ColorPopover
-              value={color}
+              value={t.color || ""}
               onChange={(c) => onUpdate?.({ color: c })}
               onClose={() => setOpenPop(null)}
             />
@@ -664,7 +662,7 @@ export default function TaskModal({
 
         {openPop === "share" && (
           <SharePopover
-            task={currentTask}
+            task={t}
             onUpdate={(sharePatch) => onUpdate?.({ share: sharePatch })}
             onClose={() => setOpenPop(null)}
           />

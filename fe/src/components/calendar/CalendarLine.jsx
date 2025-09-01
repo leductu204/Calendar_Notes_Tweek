@@ -1,3 +1,4 @@
+// FE: fe/src/components/calendar/CalendarLine.jsx
 import React, { memo, useState, useMemo, useCallback } from 'react';
 import { useData } from '../../context/DataContext.jsx';
 import { RepeatIcon } from '../modals/IconSet.jsx';
@@ -41,7 +42,6 @@ function CalendarLine({
   const { getTask, updateMeta, toggleDone } = useData();
   const task = getTask(dateKey, lineIdx);
 
-  // Tương thích: ưu tiên is_done/repeat_info, fallback done/repeat
   const isDone = !!(task?.is_done ?? task?.done ?? false);
   const repeatInfo = task?.repeat_info ?? task?.repeat ?? { type: 'never' };
 
@@ -49,7 +49,7 @@ function CalendarLine({
 
   const text = (task?.text || '').trim();
   const hasText = text !== '';
-  const hasChip = hasText && !!task?.color; // chỉ dùng để quyết định hiển thị chip
+  const hasChip = hasText && !!task?.color;
 
   const chipStyle = useMemo(() => {
     if (!hasChip) return {};
@@ -137,8 +137,6 @@ function CalendarLine({
             >
               <CheckIcon />
             </button>
-
-            
             <div className="open-detail-hit" onClick={openDetail} />
           </>
         )}

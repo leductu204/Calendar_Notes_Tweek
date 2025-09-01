@@ -1,7 +1,8 @@
-// src/api/index.js
-export * as tasks from './tasks';
+// Tập trung export theo namespace để dùng: import * as API from '../api'
+
+export * as tasks from './tasks';           // nếu bạn có file này
 export { calendars } from './calendars';
-export { auth } from './auth';
-export { storage } from './storage';
-export { someday } from './someday';
-export * from './_fetch';
+export * as auth from './auth';             // tuỳ bạn, có thể xoá nếu không dùng
+export * as storage from './storage';
+export * as someday from './someday';       // nếu có
+export * from './_fetch';                    // apiFetch, API_BASE_URL, ...

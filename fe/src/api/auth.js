@@ -1,27 +1,57 @@
 // src/api/auth.js
 import { apiFetch } from './_fetch';
+import * as storage from './storage';
 
+function pickActiveCalendarId(calendars) {
+  if (!Array.isArray(calendars) || calendars.length === 0) return null;
+  const def = calendars.find(c => c.is_default);
+  return String((def || calendars[0]).id);
+}
+
+export async function loginWithEmailPassword(email, password) {
+  const resp = await apiFetch('/api/auth/login', {
+    method: 'POST',
+    body: { email, password }
+  });
+  const token = resp?.token;
+  const user  = resp?.user || null;
+  if (!token) throw new Error('Đăng nhập thất bại');
+
+  storage.setToken(token);
+  storage.setUser(user);
+
+  const calendars = await apiFetch('/api/calendars');
+  const chosen = pickActiveCalendarId(calendars);
+  if (chosen) storage.setActiveCalendarId(chosen);
+
+  return resp;
+}
+
+export async function registerWithEmailPassword(name, email, password) {
+  const resp = await apiFetch('/api/auth/register', {
+    method: 'POST',
+    body: { name, email, password }
+  });
+  const token = resp?.token;
+  const user  = resp?.user || null;
+  if (!token) throw new Error('Đăng ký thất bại');
+
+  storage.setToken(token);
+  storage.setUser(user);
+
+  const calendars = await apiFetch('/api/calendars');
+  const chosen = pickActiveCalendarId(calendars);
+  if (chosen) storage.setActiveCalendarId(chosen);
+
+  return resp;
+}
+
+// Cho App.jsx sử dụng
 export const auth = {
-  async register({ name, email, password }) {
-    return apiFetch('/api/auth/register', { method: 'POST', body: { name, email, password } });
-  },
-  async login({ email, password }) {
-    return apiFetch('/api/auth/login', { method: 'POST', body: { email, password } });
-  },
+  setToken: storage.setToken,
   logout() {
-    try {
-      localStorage.removeItem('token');
-      // NEW: xoá id lịch hiện tại để quay về scope 'guest'
-      localStorage.removeItem('app.activeCalendarId');
-      // bắn event cho toàn app
-      window.dispatchEvent(new Event('authChange'));
-      window.dispatchEvent(new Event('activeCalendarChanged'));
-    } catch {}
-  },
-  setToken(token) {
-    try {
-      localStorage.setItem('token', token);
-      window.dispatchEvent(new Event('authChange'));
-    } catch {}
-  },
+    storage.setToken(null);
+    storage.setUser(null);
+    storage.setActiveCalendarId(null);
+  }
 };

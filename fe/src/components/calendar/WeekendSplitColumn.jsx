@@ -1,17 +1,10 @@
+// FE: fe/src/components/calendar/WeekendSplitColumn.jsx
 import React, { memo, useRef, useCallback, useMemo } from 'react';
 import CalendarLine from './CalendarLine.jsx';
 import { formatHeader, isSameDay, toISODate } from '../../utils/dateHelpers.js';
 import { useData } from '../../context/DataContext.jsx';
 
-function DayMiniColumn({
-  date,
-  lines,
-  scope,
-  onAfterEdit,
-  inputRefs,
-  onClickHalf,
-  onOpenDetail,
-}) {
+function DayMiniColumn({ date, lines, scope, onAfterEdit, inputRefs, onClickHalf, onOpenDetail }) {
   const { getTasksForDate } = useData();             
   const hdr = formatHeader(date);
   const isToday = isSameDay(date, new Date());
@@ -54,15 +47,7 @@ function DayMiniColumn({
   );
 }
 
-function WeekendSplitColumn({
-  satDate,
-  sunDate,
-  weekdayLines,
-  linesSat,
-  linesSun,
-  onAfterEdit,
-  onOpenDetail,
-}) {
+function WeekendSplitColumn({ satDate, sunDate, weekdayLines, linesSat, linesSun, onAfterEdit, onOpenDetail }) {
   if (!satDate || !sunDate) return <div className="column weekend-split" />;
 
   const satRefs = useRef([]);

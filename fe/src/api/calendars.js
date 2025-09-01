@@ -1,5 +1,6 @@
 // src/api/calendars.js
 import { apiFetch } from './_fetch';
+import * as storage from './storage';
 
 export const calendars = {
   list() {
@@ -9,12 +10,9 @@ export const calendars = {
     return apiFetch('/api/calendars', { method: 'POST', body: { name, type } });
   },
   getActiveCalendarId() {
-    try { return localStorage.getItem('activeCalendarId'); } catch { return null; }
+    return storage.getActiveCalendarId();
   },
   setActiveCalendarId(id) {
-    try {
-      localStorage.setItem('activeCalendarId', id);
-      window.dispatchEvent(new Event('activeCalendarChanged'));
-    } catch {}
+    storage.setActiveCalendarId(id);
   },
 };

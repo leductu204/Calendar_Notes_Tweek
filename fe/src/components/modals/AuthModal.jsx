@@ -1,12 +1,13 @@
-// src/components/modals/AuthModal.jsx
+// FE: fe/src/components/modals/AuthModal.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import * as API from "../../api";
+import { API_BASE_URL } from "../../api/_fetch";
+import { loginWithEmailPassword, registerWithEmailPassword } from "../../api/auth";
 
 const nameFromEmail = (email = "") =>
   String(email).split("@")[0]
     .split(/[._-]+/g).filter(Boolean)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
- import { API_BASE_URL } from '../../api/_fetch';
+
 const API_BASE = API_BASE_URL;
 
 export default function AuthModal({
@@ -37,17 +38,17 @@ export default function AuthModal({
       setSubmitting(true);
       if (provider === "email") {
         if (mode === "signup") {
-          const { token, user } = await API.auth.register({
-            name: name?.trim() || nameFromEmail(email),
-            email: email.trim(),
-            password: pwd
-          });
+          const { token, user } = await registerWithEmailPassword(
+            name?.trim() || nameFromEmail(email),
+            email.trim(),
+            pwd
+          );
           onSuccess?.({ token, user });
         } else {
-          const { token, user } = await API.auth.login({
-            email: email.trim(),
-            password: pwd
-          });
+          const { token, user } = await loginWithEmailPassword(
+            email.trim(),
+            pwd
+          );
           onSuccess?.({ token, user });
         }
       }

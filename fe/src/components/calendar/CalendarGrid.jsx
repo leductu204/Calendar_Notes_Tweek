@@ -1,3 +1,4 @@
+// FE: fe/src/components/calendar/CalendarGrid.jsx
 import React, { useMemo, useState, useCallback } from 'react';
 import CalendarColumn from './CalendarColumn.jsx';
 import WeekendSplitColumn from './WeekendSplitColumn.jsx';
@@ -8,7 +9,6 @@ const BASE_S = 4;
 const BASE_U = 4;  
 
 export default function CalendarGrid({ days, onOpenDetail }) {
-
   const { getTasksForDate, compactDay } = useData();
 
   const [wkSun, setWkSun] = useState(0);
@@ -80,12 +80,10 @@ export default function CalendarGrid({ days, onOpenDetail }) {
   const growForScope = useCallback(
     (scope, lineIdx, text) => {
       const filled = (text ?? '').trim() !== '';
-
       if (!filled) {
         tryTrimLayers();
         return;
       }
-
       if (scope === 'weekday') {
         if (lineIdx === linesW - 1) setWkSun(v => v + 1);
         return;
@@ -105,9 +103,7 @@ export default function CalendarGrid({ days, onOpenDetail }) {
   const onAfterEdit = useCallback(
     ({ scope, dateKey, lineIdx, text }) => {
       const trimmedText = (text ?? '').trim();
-
       growForScope(scope, lineIdx, trimmedText);
-
       if (trimmedText === '') {
         compactDay(dateKey); 
         tryTrimLayers();    

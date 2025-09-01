@@ -1,56 +1,50 @@
-// src/api/tasks.js
-import { apiFetch } from './_fetch';
-import { getToken, keys, readJSON, writeJSON } from './storage';
+// fe/src/api/tasks.js
+const API_BASE = (import.meta.env?.VITE_API_BASE) || 'http://localhost:4000';
 
-// ===== Server API (đăng nhập) =====
-export const serverApi = {
-  listRange: (calendarId, from, to) =>
-    apiFetch(`/api/tasks?calendarId=${encodeURIComponent(calendarId)}&from=${from}&to=${to}`),
+function authHeaders() {
+  const t = localStorage.getItem('auth_token');
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
 
-  createTask: (taskData) =>
-    apiFetch('/api/tasks', { method: 'POST', body: taskData }),
+export async function listByRange(calendarId, from, to) {
+  const url = new URL(`${API_BASE}/api/tasks`);
+  url.searchParams.set('calendarId', String(calendarId));
+  url.searchParams.set('from', from);
+  url.searchParams.set('to', to);
+  const res = await fetch(url.toString(), { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error('listByRange failed');
+  return res.json();
+}
 
-  updateTask: (taskId, patch) =>
-    apiFetch(`/api/tasks/${taskId}`, { method: 'PATCH', body: patch }),
+export async function createDay(calendarId, payload) {
+  const body = { ...payload, calendar_id: Number(calendarId) };
+  const res = await fetch(`${API_BASE}/api/tasks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error('createDay failed');
+  return res.json();
+}
 
-  deleteTask: (taskId) =>
-    apiFetch(`/api/tasks/${taskId}`, { method: 'DELETE' }),
-};
+export async function updateTask(calendarId, taskId, patch) {
+  const body = { ...patch, calendar_id: Number(calendarId) };
+  const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error('updateTask failed');
+  return res.json();
+}
 
-// ===== Local API (khách) =====
-const getLocalCalId = () => 'guest_calendar';
-const readAllLocal = () => readJSON(keys.tasks(getLocalCalId()), {});
-const writeAllLocal = (payload) => writeJSON(keys.tasks(getLocalCalId()), payload || {});
-
-export const localApi = {
-  listAll: () => readAllLocal(),
-  getDayTasks: (dateKey) => {
-    const all = readAllLocal();
-    return Array.isArray(all[dateKey]) ? all[dateKey] : [];
-  },
-  insertTask: (dateKey, lineIdx, init) => {
-    const all = readAllLocal();
-    const day = Array.isArray(all[dateKey]) ? [...all[dateKey]] : [];
-    const curId = day[lineIdx]?.id || `local_${Date.now()}`;
-    day[lineIdx] = { ...(day[lineIdx] || {}), ...(init || {}), id: curId };
-    all[dateKey] = day;
-    writeAllLocal(all);
-  },
-  updateTask: (dateKey, lineIdx, partial) => {
-    const all = readAllLocal();
-    const day = Array.isArray(all[dateKey]) ? [...all[dateKey]] : [];
-    const cur = (typeof day[lineIdx] === 'object' && day[lineIdx] !== null)
-      ? day[lineIdx]
-      : { text: day[lineIdx] || '' };
-    day[lineIdx] = { ...cur, ...partial, id: cur.id || `local_${Date.now()}` };
-    all[dateKey] = day;
-    writeAllLocal(all);
-  },
-  removeTask: (dateKey, lineIdx) => {
-    const all = readAllLocal();
-    const day = Array.isArray(all[dateKey]) ? [...all[dateKey]] : [];
-    day.splice(lineIdx, 1);
-    all[dateKey] = day;
-    writeAllLocal(all);
-  },
-};
+export async function deleteTask(calendarId, taskId) {
+  const url = new URL(`${API_BASE}/api/tasks/${taskId}`);
+  url.searchParams.set('calendarId', String(calendarId));
+  const res = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok && res.status !== 204) throw new Error('deleteTask failed');
+  return true;
+}

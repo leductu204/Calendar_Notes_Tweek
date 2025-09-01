@@ -1,4 +1,4 @@
-// src/controllers/shareController.js
+// BE: be/src/controllers/shareController.js
 const db = require('../config/db');
 
 exports.getSharedTask = async (req, res) => {

@@ -1,3 +1,4 @@
+// src/components/modals/popovers/SharePopover.jsx
 import React, { useEffect, useMemo, useState } from "react";
 
 const emailOk = (s) => /\S+@\S+\.\S+/.test((s || "").trim());
@@ -10,21 +11,26 @@ const buildLink = (tkn) => `${location.origin}/s/t/${tkn}`;
 const avatarText = (email) => (email || "?").trim()[0]?.toUpperCase() || "U";
 
 export default function SharePopover({ task, onUpdate, onClose }) {
- 
-  const [enabled, setEnabled] = useState(!!task?.share?.enabled);
-  const [token, setToken]     = useState(task?.share?.token || "");
-  const [invites, setInvites] = useState(task?.share?.invites || []);
+  // Ưu tiên share_info, fallback share (để tương thích dữ liệu cũ)
+  const shareSrc = task?.share_info ?? task?.share ?? {};
+
+  const [enabled, setEnabled] = useState(!!shareSrc.enabled);
+  const [token, setToken]     = useState(shareSrc.token || "");
+  const [invites, setInvites] = useState(shareSrc.invites || []);
   const [showInvite, setShowInvite] = useState(false);
   const [invite, setInvite]   = useState("");
 
   useEffect(() => {
-    setEnabled(!!task?.share?.enabled);
-    setToken(task?.share?.token || "");
-    setInvites(task?.share?.invites || []);
-  }, [task?.share?.enabled, task?.share?.token, task?.share?.invites]);
+    const s = task?.share_info ?? task?.share ?? {};
+    setEnabled(!!s.enabled);
+    setToken(s.token || "");
+    setInvites(s.invites || []);
+  }, [task?.share_info, task?.share]);
 
   const link = useMemo(() => (token ? buildLink(token) : ""), [token]);
-  const persist = (next) => onUpdate?.({ share: next });
+
+  // Luôn phát patch dưới key share_info để đồng bộ với DataContext/adapter
+  const persist = (next) => onUpdate?.({ share_info: next });
 
   const toggle = (v) => {
     let nextToken = token;
@@ -84,7 +90,7 @@ export default function SharePopover({ task, onUpdate, onClose }) {
 
   return (
     <>
-      
+      {/* click ra ngoài để đóng */}
       <div style={backdropStyle} onMouseDown={onClose} />
 
       <div style={wrapStyle} onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
@@ -178,23 +184,21 @@ export default function SharePopover({ task, onUpdate, onClose }) {
           </ul>
         )}
       </div>
-
     </>
   );
 }
 
-/*Styles*/
-const PURPLE = "#DCCAF8";      
-const SW_H = 32;               
-const SW_W = 60;               
-const SW_BORDER = 2;           
-const SW_GAP = 1;              
+/* Styles */
+const PURPLE = "#DCCAF8";
+const SW_H = 32;
+const SW_W = 60;
+const SW_BORDER = 2;
+const SW_GAP = 1;
 const KNOB = SW_H - 2 * SW_GAP;
-const BIAS_OFF = -2; 
-const BIAS_ON  =  2;  
+const BIAS_OFF = -2;
+const BIAS_ON  =  2;
 
 const s = {
-  
   card: {
     background: "#111",
     color: "#fff",
@@ -208,9 +212,7 @@ const s = {
   cardSub: { opacity: 0.8, fontSize: 13, fontWeight: 500 },
   cardTitle: { fontWeight: 700, fontSize: 16, marginTop: 2 },
 
-  
   switchContainer: { width: SW_W, height: SW_H, flexShrink: 0 },
-  
   switch: {
     width: "100%",
     height: "100%",
@@ -234,9 +236,7 @@ const s = {
     boxShadow: "0 1px 3px rgba(0,0,0,.35)",
     transition: "left .18s ease",
   },
-  knobOn: {
-    left: `calc(100% - ${SW_GAP + KNOB - BIAS_ON}px)`,
-  },
+  knobOn: { left: `calc(100% - ${SW_GAP + KNOB - BIAS_ON}px)` },
 
   linkBox: { borderRadius: 12, padding: 6, display: "flex", alignItems: "center", gap: 6 },
   linkInput: {

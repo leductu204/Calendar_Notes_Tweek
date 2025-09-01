@@ -1,4 +1,4 @@
-// src/app/App.jsx
+// fe/src/app/App.jsx
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Header from '../components/layout/Header.jsx';
 import CalendarGrid from '../components/calendar/CalendarGrid.jsx';
@@ -8,42 +8,30 @@ import TaskModal from '../components/modals/TaskModal.jsx';
 import AuthModal from '../components/modals/AuthModal.jsx';
 import { UiProvider } from '../context/UiContext.jsx';
 import { DataProvider, useData } from '../context/DataContext.jsx';
+import { SomedayProvider } from '../context/SomedayContext.jsx';
 import { useWeek } from '../hooks/useWeek.js';
 import CalendarSettingsModal from '../components/modals/CalendarSettingsModal.jsx';
 import AccountModal from '../components/modals/AccountModal.jsx';
 import * as API from '../api';
 
-// Helper: token hợp lệ (không tính 'null'/'undefined' string)
-const hasValidToken = () => {
-  try {
-    const t = API.storage.getToken();
-    return !!(t && t !== 'null' && t !== 'undefined');
-  } catch { return false; }
-};
+const API_BASE = (import.meta.env?.VITE_API_BASE) || 'http://localhost:4000';
 
+/* Helpers */
 const addDays = (date, d = 0) => {
   const x = new Date(date);
   x.setHours(12, 0, 0, 0);
   x.setDate(x.getDate() + d);
   return x;
 };
-const endOfWeekMonSun = (date) => {
-  const x = new Date(date);
-  const dow = x.getDay();
-  const toSun = (7 - dow) % 7;
-  x.setDate(x.getDate() + toSun);
-  x.setHours(12, 0, 0, 0);
-  return x;
-};
 const keyOf = (d) => {
   const x = new Date(d);
-  x.setHours(12, 0, 0, 0);
-  return x.toISOString().slice(0, 10);
+  x.setHours(12,0,0,0);
+  return x.toISOString().slice(0,10);
 };
 
 function AppShell() {
   const { days, prevWeek, nextWeek } = useWeek();
-  const { tasks, getTask, getTasksForDate, updateMeta, removeTask } = useData();
+  const { getTask, getTasksForDate, updateMeta, removeTask } = useData();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeTaskInfo, setActiveTaskInfo] = useState(null);
@@ -55,101 +43,119 @@ function AppShell() {
   const [calendars, setCalendars] = useState([]);
   const [activeCalendarId, setActiveCalendarId] = useState(() => API.calendars.getActiveCalendarId());
 
-  // 🔐 Trạng thái đăng nhập rõ ràng
-  const [authed, setAuthed] = useState(() => hasValidToken());
+  const [authed, setAuthed] = useState(() => !!API.storage.getToken());
 
-  // Lắng nghe thay đổi token
-  const [authVer, setAuthVer] = useState(0);
   useEffect(() => {
-    const onAuth = () => {
-      setAuthVer(v => v + 1);
-      setAuthed(hasValidToken());
-    };
+    const onAuth = () => setAuthed(!!API.storage.getToken());
     window.addEventListener('authChange', onAuth);
     return () => window.removeEventListener('authChange', onAuth);
   }, []);
 
+  // Bootstrap
   useEffect(() => {
-    // Không có token hợp lệ → bảo đảm về guest
-    if (!hasValidToken()) {
+    const token = API.storage.getToken();
+    if (!token) {
+      setUser(null);
       setAuthed(false);
-      setCalendars([]);
-      setActiveCalendarId(null);
       return;
     }
-    API.calendars.list().then(list => {
-      setCalendars(list || []);
-      const stored = API.calendars.getActiveCalendarId();
-      const nextId = stored || (list && list[0]?.id) || null;
-      if (nextId) {
-        setActiveCalendarId(String(nextId));
-        API.calendars.setActiveCalendarId(String(nextId));
-      }
-    }).catch(() => {
-      // BE không sẵn sàng → về guest để nhập được ngay
-      setAuthed(false);
-      setCalendars([]);
-      setActiveCalendarId(null);
-      try { window.dispatchEvent(new Event('authChange')); } catch {}
-    });
-  }, [authVer]);
+    (async () => {
+      try {
+        const me = await API.apiFetch('/api/auth/me');
+        const u = me?.user || null;
+        setUser(u);
+        API.storage.setUser(u);
 
-  // === NHẬN TOKEN SAU KHI GOOGLE REDIRECT VỀ FE ===
+        const list = await API.calendars.list().catch(() => []);
+        setCalendars(list || []);
+
+        const stored = API.storage.getActiveCalendarId();
+        const nextId = stored || (list && list[0]?.id) || null;
+        if (nextId) {
+          setActiveCalendarId(String(nextId));
+          API.storage.setActiveCalendarId(String(nextId));
+        }
+      } catch {
+        API.storage.setToken(null);
+        API.storage.setUser(null);
+        setUser(null);
+        setAuthed(false);
+      }
+    })();
+  }, []);
+
+  // OAuth callback (?token=&user=)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const userJson = params.get('user');
-    if (token) {
-      API.auth.setToken(token);
-      try { setUser(JSON.parse(userJson)); } catch { setUser(null); }
 
-      // Clear query string (không reload)
+    if (token) {
+      API.storage.setToken(token);
+      try {
+        const u = JSON.parse(userJson || 'null');
+        setUser(u || null);
+        API.storage.setUser(u || null);
+      } catch {
+        setUser(null);
+        API.storage.setUser(null);
+      }
+
       const url = new URL(window.location.href);
       url.search = '';
       window.history.replaceState({}, '', url.toString());
 
-      // Tải lại calendars
       API.calendars.list().then(list => {
         setCalendars(list || []);
-        const nextId = API.calendars.getActiveCalendarId() || list?.[0]?.id || null;
-        if (nextId) setActiveCalendarId(String(nextId));
+        const nextId =
+          API.storage.getActiveCalendarId() || list?.[0]?.id || null;
+        if (nextId) {
+          setActiveCalendarId(String(nextId));
+          API.storage.setActiveCalendarId(String(nextId));
+        }
       }).catch(() => {});
     }
   }, []);
 
   useEffect(() => {
     if (!activeCalendarId) return;
-    API.calendars.setActiveCalendarId(String(activeCalendarId));
+    API.storage.setActiveCalendarId(String(activeCalendarId));
     window.dispatchEvent(new Event('activeCalendarChanged'));
   }, [activeCalendarId]);
 
-  const activeCalendar = calendars.find(c => String(c.id) === String(activeCalendarId)) || null;
+  const activeCalendar =
+    calendars.find(c => String(c.id) === String(activeCalendarId)) || null;
 
   const handleCreateCalendar = async ({ type, name }) => {
     const created = await API.calendars.create({ type, name });
     const list = await API.calendars.list();
     setCalendars(list || []);
     const nextId = created?.id || list?.[0]?.id || null;
-    if (nextId) setActiveCalendarId(String(nextId));
+    if (nextId) {
+      setActiveCalendarId(String(nextId));
+      API.storage.setActiveCalendarId(String(nextId));
+    }
   };
 
-  const handleSwitchCalendar = (id) => {
-    setActiveCalendarId(String(id));
-  };
+  const handleSwitchCalendar = (id) => setActiveCalendarId(String(id));
 
   const handleAuthSuccess = ({ token, user }) => {
-    if (token) API.auth.setToken(token);
+    if (token) API.storage.setToken(token);
+    API.storage.setUser(user || null);
     setUser(user || null);
+
     API.calendars.list().then(list => {
       setCalendars(list || []);
-      const nextId = API.calendars.getActiveCalendarId() || list?.[0]?.id || null;
+      const nextId =
+        API.storage.getActiveCalendarId() || list?.[0]?.id || null;
       if (nextId) setActiveCalendarId(String(nextId));
     }).catch(() => {});
     setShowAuth(false);
   };
 
   const handleLogout = () => {
-    API.auth.logout();
+    API.storage.setToken(null);
+    API.storage.setUser(null);
     setUser(null);
     setCalendars([]);
     setActiveCalendarId(null);
@@ -157,9 +163,11 @@ function AppShell() {
 
   const handleUpdateUser = () => {};
 
+  // refs cho CalendarGrid / SomedaySection (nếu cần sau này)
   const somedayApiRef = useRef(null);
   const calendarApiRef = useRef(null);
 
+  /* === MỞ MODAL: luôn gắn kèm data === */
   const openTaskDetail = useCallback((payload) => {
     if (payload?.type === 'someday') {
       const taskData = {
@@ -177,18 +185,22 @@ function AppShell() {
       };
       setActiveTaskInfo({ payload, data: taskData });
     } else {
-      const taskData = getTask(payload.dateKey, payload.lineIdx);
-      setActiveTaskInfo({ payload, data: { ...taskData, date: payload.date || new Date(payload.dateKey) } });
+      const taskData = getTask?.(payload.dateKey, payload.lineIdx) || {};
+      setActiveTaskInfo({
+        payload,
+        data: { ...taskData, date: payload.date || new Date(payload.dateKey) }
+      });
     }
   }, [getTask]);
 
   const closeTaskDetail = useCallback(() => setActiveTaskInfo(null), []);
 
+  /* ---- Move/Duplicate helpers (local) ---- */
   const moveTaskToDateLocal = useCallback((fromDateKey, lineIdx, targetDate) => {
     const targetKey = keyOf(targetDate);
-    const data = getTask(fromDateKey, lineIdx);
+    const data = getTask?.(fromDateKey, lineIdx) || {};
     removeTask(fromDateKey, lineIdx);
-    const targetIndex = (getTasksForDate(targetKey)?.length || 0);
+    const targetIndex = (getTasksForDate?.(targetKey)?.length || 0);
     const patch = {
       text: data.text || '',
       notes: data.notes || '',
@@ -204,8 +216,8 @@ function AppShell() {
   }, [getTask, getTasksForDate, removeTask, updateMeta]);
 
   const duplicateTaskLocal = useCallback((dateKey, lineIdx) => {
-    const data = getTask(dateKey, lineIdx);
-    const idx = (getTasksForDate(dateKey)?.length || 0);
+    const data = getTask?.(dateKey, lineIdx) || {};
+    const idx = (getTasksForDate?.(dateKey)?.length || 0);
     const patch = {
       text: data.text || '',
       notes: data.notes || '',
@@ -220,6 +232,7 @@ function AppShell() {
     updateMeta(dateKey, idx, patch);
   }, [getTask, getTasksForDate, updateMeta]);
 
+  /* ---- Update/Delete/Move actions ---- */
   const handleUpdateTask = useCallback((updatedData) => {
     if (!activeTaskInfo) return;
     const p = activeTaskInfo.payload;
@@ -292,20 +305,37 @@ function AppShell() {
   }, [activeTaskInfo, moveToDateHandler]);
 
   const handleMoveToSomeday = useCallback(() => {
-    if (!activeTaskInfo || activeTaskInfo.payload.type === 'someday') return;
-    const { dateKey, lineIdx } = activeTaskInfo.payload;
-    const data = getTask(dateKey, lineIdx);
-    somedayApiRef.current?.createSomedayTask?.(0, data);
-    removeTask(dateKey, lineIdx);
-    closeTaskDetail();
-  }, [activeTaskInfo, getTask, removeTask, closeTaskDetail]);
+  if (!activeTaskInfo || activeTaskInfo.payload.type === 'someday') return;
+  const { dateKey, lineIdx } = activeTaskInfo.payload;
+  const data = getTask?.(dateKey, lineIdx) || {};
+
+  const row = {
+    text: data.text || '',
+    notes: data.notes || '',
+    color: data.color || '',
+    subtasks: Array.isArray(data.subtasks) ? data.subtasks : [],
+    attachments: Array.isArray(data.attachments) ? data.attachments : [],
+    repeat_info: data.repeat_info || { type: 'never' },
+    reminder_info: data.reminder_info || null,
+    share_info: data.share_info || { enabled: false },
+    links: Array.isArray(data.links) ? data.links : [],
+    done: !!(data.done ?? data.is_done),
+    is_done: !!(data.done ?? data.is_done),
+  };
+
+  // ⬇️ gọi API tạo task bên Someday
+  somedayApiRef.current?.createSomedayTask?.(null, row, undefined);
+
+  removeTask(dateKey, lineIdx);
+  closeTaskDetail();
+ }, [activeTaskInfo, getTask, removeTask, closeTaskDetail]);
+
 
   const handleDuplicate = useCallback(() => {
     if (!activeTaskInfo) return;
     const p = activeTaskInfo.payload;
 
     if (p.type === 'someday') {
-      // Nhân bản ngay dưới dòng hiện tại
       const data = activeTaskInfo.data || {};
       const row = {
         ...data,
@@ -320,17 +350,16 @@ function AppShell() {
         share_info: data.share_info || { enabled: false },
         links: Array.isArray(data.links) ? data.links : [],
       };
-
-      // Truyền vị trí chèn (sau rowIndex hiện tại)
-      somedayApiRef.current?.createSomedayTask?.(p.columnId, row, p.rowIndex);
+      // nếu SomedayProvider có API tạo hàng mới:
+       somedayApiRef.current?.createSomedayTask?.(p.columnId, row, p.rowIndex);
     } else {
-      // Lịch tuần: nhân bản như cũ
       duplicateTaskLocal(p.dateKey, p.lineIdx);
     }
   }, [activeTaskInfo, duplicateTaskLocal]);
 
   const handleAddAttachment = useCallback(() => {}, []);
 
+  // Khoá scroll nền khi có modal
   const anyModalOpen =
     !!activeTaskInfo ||
     isSearchOpen ||
@@ -344,130 +373,10 @@ function AppShell() {
     return () => document.body.classList.remove('modal-open');
   }, [anyModalOpen]);
 
-  useEffect(() => {
-    // Phòng khi 'modal-open' bị kẹt do hot-reload / phiên cũ
-    document.body.classList.remove('modal-open');
-    // Gỡ inline style lock-scroll nếu còn sót từ phiên trước
-    try {
-      const keys = ['position','top','left','right','width','overflow','paddingRight'];
-      keys.forEach(k => { document.body.style[k] = ''; });
-    } catch {}
-  }, []);
-
-  // === Scope cho Someday (guest | user | cal:<id>) ===
+  // Scope Someday (nếu dùng)
   const somedayScope = authed
     ? (activeCalendarId ? `cal:${activeCalendarId}` : 'user')
     : 'guest';
-
-  // ❌ ĐÃ BỎ: không xoá Someday guest nữa (để tránh mất dữ liệu khi login)
-
-  // ➜ Migrate: guest → scope hiện tại khi đăng nhập
-  useEffect(() => {
-    if (!authed) return;
-    const scope = activeCalendarId ? `cal:${activeCalendarId}` : 'user';
-    try {
-      const guestKey = 'someday_tasks_v2:guest';
-      const dstKey   = `someday_tasks_v2:${scope}`;
-
-      const guestRaw = localStorage.getItem(guestKey);
-      if (!guestRaw) return;
-
-      const dstRaw = localStorage.getItem(dstKey);
-      const guest  = JSON.parse(guestRaw || '[]');
-      const dst    = JSON.parse(dstRaw || '[]');
-
-      const merged = [...dst];
-      for (const t of guest) {
-        if (!merged.some(x => x && t && x.id === t.id)) merged.push(t);
-      }
-
-      localStorage.setItem(dstKey, JSON.stringify(merged));
-      localStorage.removeItem(guestKey);
-    } catch (e) {
-      console.warn('Migrate Someday guest → signed-in failed', e);
-    }
-  }, [authed, activeCalendarId]);
-   useEffect(() => {
-  const isTaskInput = (el) =>
-    el?.classList?.contains('calendar-task-input') ||
-    el?.classList?.contains('someday-task-input');
-
-  const getRow = (el) => el?.closest?.('.task-line-row, .someday-row');
-
-  const commitRow = (rowEl) => {
-    if (!rowEl) return;
-    // Đặt cờ khóa
-    rowEl.classList.add('is-committed');
-    rowEl.classList.add('just-committed');
-    // Bỏ cờ chống-dính sau 160ms
-    setTimeout(() => rowEl.classList.remove('just-committed'), 160);
-  };
-
-  // Enter -> commit (nếu có nội dung)
-  const onKeyDown = (e) => {
-    if (e.key !== 'Enter') return;
-    const el = e.target;
-    if (!(el instanceof HTMLInputElement) || !isTaskInput(el)) return;
-    if (!(el.value || '').trim()) return; // rỗng thì thôi, không khóa
-    const row = getRow(el);
-    commitRow(row);
-    e.preventDefault();
-    el.blur();
-  };
-
-  // Blur (click ra ngoài) -> commit nếu có nội dung
-  const onBlur = (e) => {
-    const el = e.target;
-    if (!(el instanceof HTMLInputElement) || !isTaskInput(el)) return;
-    if (!(el.value || '').trim()) return; // rỗng thì không khóa
-    const row = getRow(el);
-    commitRow(row);
-  };
-
-  // Quét đầu vào: các hàng đã có text khi render thì xem là đã commit sẵn
-  const scanExisting = () => {
-    document
-      .querySelectorAll('.calendar-task-input, .someday-task-input')
-      .forEach((el) => {
-        const row = getRow(el);
-        if (!row) return;
-        if ((el.value || '').trim()) row.classList.add('is-committed');
-        else row.classList.remove('is-committed');
-      });
-  };
-  // quét khi mount
-  setTimeout(scanExisting, 0);
-
-  // Cho phép trigger quét lại nếu bạn cần (VD sau khi modal cập nhật text)
-  const rescan = () => setTimeout(scanExisting, 0);
-  window.addEventListener('calendar:rescanCommit', rescan);
-  window.addEventListener('someday:rescanCommit', rescan);
-
-  document.addEventListener('keydown', onKeyDown, true);
-  document.addEventListener('blur', onBlur, true);
-
-  return () => {
-    document.removeEventListener('keydown', onKeyDown, true);
-    document.removeEventListener('blur', onBlur, true);
-    window.removeEventListener('calendar:rescanCommit', rescan);
-    window.removeEventListener('someday:rescanCommit', rescan);
-  };
-}, []);
-
-  // ➜ Nếu đã có cal:<id> mà trống, copy từ "user" (tránh trắng khi vừa chọn lịch)
-  useEffect(() => {
-    if (!authed || !activeCalendarId) return;
-    try {
-      const userKey = 'someday_tasks_v2:user';
-      const calKey  = `someday_tasks_v2:cal:${activeCalendarId}`;
-      if (!localStorage.getItem(userKey)) return;
-      if (!localStorage.getItem(calKey)) {
-        localStorage.setItem(calKey, localStorage.getItem(userKey));
-      }
-    } catch (e) {
-      console.warn('Copy Someday user → cal failed', e);
-    }
-  }, [authed, activeCalendarId]);
 
   return (
     <div className="container">
@@ -482,26 +391,20 @@ function AppShell() {
         onOpenCalendarSettings={() => setShowCalSettings(true)}
         onOpenAccount={() => setShowAccount(true)}
         calendars={calendars}
-        activeCalendar={activeCalendar}
-        onSwitchCalendar={handleSwitchCalendar}
+        activeCalendar={calendars.find(c => String(c.id) === String(activeCalendarId)) || null}
+        onSwitchCalendar={setActiveCalendarId}
         onCreateCalendar={handleCreateCalendar}
       />
 
-      <CalendarGrid
-        days={days}
-        onOpenDetail={openTaskDetail}
-        registerApi={(api) => { calendarApiRef.current = api; }}
-      />
-
-      <SomedaySection
-        onOpenTask={openTaskDetail}
-        registerApi={(api) => { somedayApiRef.current = api; }}
-        scope={somedayScope}
+      {/* ✅ dùng openTaskDetail để truyền cả payload + data */}
+      <CalendarGrid days={days} onOpenDetail={openTaskDetail} />
+      <SomedaySection onOpenTask={openTaskDetail} 
+      registerApi={(api) => { somedayApiRef.current = api; }}
       />
 
       {isSearchOpen && (
         <SearchModal
-          tasks={tasks}
+          tasks={{}}
           onClose={() => setIsSearchOpen(false)}
           onOpenTask={openTaskDetail}
         />
@@ -511,6 +414,7 @@ function AppShell() {
         isOpen={!!activeTaskInfo}
         task={activeTaskInfo?.data}
         isSomeday={activeTaskInfo?.payload?.type === 'someday'}
+       
         onClose={closeTaskDetail}
         onUpdate={handleUpdateTask}
         onDelete={handleDeleteTask}
@@ -528,17 +432,8 @@ function AppShell() {
         onSuccess={handleAuthSuccess}
       />
 
-      <CalendarSettingsModal
-        open={showCalSettings}
-        onClose={() => setShowCalSettings(false)}
-      />
-
-      <AccountModal
-        open={showAccount}
-        onClose={() => setShowAccount(false)}
-        user={user}
-        onUpdateUser={handleUpdateUser}
-      />
+      <CalendarSettingsModal open={showCalSettings} onClose={() => setShowCalSettings(false)} />
+      <AccountModal open={showAccount} onClose={() => setShowAccount(false)} user={user} />
     </div>
   );
 }
@@ -547,7 +442,9 @@ export default function App() {
   return (
     <UiProvider>
       <DataProvider>
-        <AppShell />
+        <SomedayProvider>
+          <AppShell />
+        </SomedayProvider>
       </DataProvider>
     </UiProvider>
   );

@@ -1,4 +1,4 @@
-// D:\ghichu\be\src\routes\calendarRoutes.js
+// BE: be/src/routes/calendarRoutes.js
 const express = require('express');
 const router = express.Router();
 const calendarController = require('../controllers/calendarController');

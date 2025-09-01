@@ -1,3 +1,4 @@
+// FE: fe/src/components/calendar/CalendarColumn.jsx
 import React, { memo, useMemo, useRef, useCallback } from 'react';
 import CalendarLine from './CalendarLine.jsx';
 import { formatHeader, isSameDay, toISODate } from '../../utils/dateHelpers.js';
