@@ -3,8 +3,10 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Header from '../components/layout/Header.jsx';
 import CalendarGrid from '../components/calendar/CalendarGrid.jsx';
 import SomedaySection from '../components/someday/SomedaySection.jsx';
+import CalendarNotesGrid from '../components/calendar/CalendarNotesGrid.jsx';
 import SearchModal from '../components/modals/SearchModal.jsx';
-import TaskModal from '../components/modals/TaskModal.jsx';
+// import TaskModal from '../components/modals/TaskModal.jsx';
+import NoteEditor from '../components/notes/NoteEditor.jsx';
 import AuthModal from '../components/modals/AuthModal.jsx';
 import { UiProvider } from '../context/UiContext.jsx';
 import { DataProvider, useData } from '../context/DataContext.jsx';
@@ -13,6 +15,7 @@ import { useWeek } from '../hooks/useWeek.js';
 import CalendarSettingsModal from '../components/modals/CalendarSettingsModal.jsx';
 import AccountModal from '../components/modals/AccountModal.jsx';
 import * as API from '../api';
+import '../styles/notes.css';
 
 const API_BASE = (import.meta.env?.VITE_API_BASE) || 'http://localhost:4000';
 
@@ -25,8 +28,8 @@ const addDays = (date, d = 0) => {
 };
 const keyOf = (d) => {
   const x = new Date(d);
-  x.setHours(12,0,0,0);
-  return x.toISOString().slice(0,10);
+  x.setHours(12, 0, 0, 0);
+  return x.toISOString().slice(0, 10);
 };
 
 function AppShell() {
@@ -43,10 +46,46 @@ function AppShell() {
   const [calendars, setCalendars] = useState([]);
   const [activeCalendarId, setActiveCalendarId] = useState(() => API.calendars.getActiveCalendarId());
 
-  const [authed, setAuthed] = useState(() => !!API.storage.getToken());
+  const [authed, setAuthed] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Settings state
+  const [settings, setSettings] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("calendar.settings") || "{}"); } catch { return {}; }
+  });
 
   useEffect(() => {
-    const onAuth = () => setAuthed(!!API.storage.getToken());
+    const onSettings = (e) => setSettings(e.detail);
+    window.addEventListener('calendar:settings', onSettings);
+    return () => window.removeEventListener('calendar:settings', onSettings);
+  }, []);
+
+  // Auto-move overdue tasks if enabled
+  useEffect(() => {
+    if (authed && activeCalendarId && settings.moveUncompletedToday) {
+      const today = keyOf(new Date());
+      API.tasks.moveOverdueToToday(activeCalendarId, today)
+        .then((res) => {
+          if (res.updated > 0) {
+            console.log(`[App] Moved ${res.updated} overdue tasks to today`);
+            window.dispatchEvent(new Event('activeCalendarChanged')); // Refresh data
+          }
+        })
+        .catch(err => console.error('[App] Auto-move failed:', err));
+    }
+  }, [authed, activeCalendarId, settings.moveUncompletedToday]);
+
+  useEffect(() => {
+    const onAuth = () => {
+      const hasToken = !!API.storage.getToken();
+      console.log('[App] Auth change event - token exists:', hasToken);
+      setAuthed(hasToken);
+      if (!hasToken) {
+        setUser(null);
+        setCalendars([]);
+        setActiveCalendarId(null);
+      }
+    };
     window.addEventListener('authChange', onAuth);
     return () => window.removeEventListener('authChange', onAuth);
   }, []);
@@ -54,32 +93,55 @@ function AppShell() {
   // Bootstrap
   useEffect(() => {
     const token = API.storage.getToken();
+    console.log('[App] Bootstrap - token found:', !!token);
+
     if (!token) {
+      console.log('[App] No token, setting user to null');
       setUser(null);
       setAuthed(false);
+      setAuthChecked(true);
       return;
     }
+
+    console.log('[App] Token found, verifying with server...');
     (async () => {
       try {
         const me = await API.apiFetch('/api/auth/me');
         const u = me?.user || null;
+        console.log('[App] Auth verification successful:', u);
         setUser(u);
         API.storage.setUser(u);
 
         const list = await API.calendars.list().catch(() => []);
+        console.log('[App] Calendars loaded:', list?.length || 0);
         setCalendars(list || []);
 
         const stored = API.storage.getActiveCalendarId();
-        const nextId = stored || (list && list[0]?.id) || null;
+        let nextId = stored;
+        
+        // Validate stored ID against list
+        const isValid = list?.some(c => String(c.id) === String(stored));
+        if (!isValid) {
+          nextId = (list && list[0]?.id) || null;
+        }
+
+        console.log('[App] Setting active calendar:', nextId);
         if (nextId) {
           setActiveCalendarId(String(nextId));
           API.storage.setActiveCalendarId(String(nextId));
         }
-      } catch {
+
+        // Explicitly set authed to true after successful verification
+        setAuthed(true);
+        setAuthChecked(true);
+        console.log('[App] Authentication complete, user is authenticated');
+      } catch (error) {
+        console.error('[App] Auth verification failed:', error);
         API.storage.setToken(null);
         API.storage.setUser(null);
         setUser(null);
         setAuthed(false);
+        setAuthChecked(true);
       }
     })();
   }, []);
@@ -113,7 +175,7 @@ function AppShell() {
           setActiveCalendarId(String(nextId));
           API.storage.setActiveCalendarId(String(nextId));
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, []);
 
@@ -149,7 +211,7 @@ function AppShell() {
       const nextId =
         API.storage.getActiveCalendarId() || list?.[0]?.id || null;
       if (nextId) setActiveCalendarId(String(nextId));
-    }).catch(() => {});
+    }).catch(() => { });
     setShowAuth(false);
   };
 
@@ -161,7 +223,7 @@ function AppShell() {
     setActiveCalendarId(null);
   };
 
-  const handleUpdateUser = () => {};
+  const handleUpdateUser = () => { };
 
   // refs cho CalendarGrid / SomedaySection (nếu cần sau này)
   const somedayApiRef = useRef(null);
@@ -182,6 +244,7 @@ function AppShell() {
         reminder_info: payload.reminder_info || payload.reminder || null,
         share_info: payload.share_info || payload.share || { enabled: false },
         links: payload.links || [],
+        extra_notes: payload.extra_notes || '',
       };
       setActiveTaskInfo({ payload, data: taskData });
     } else {
@@ -211,6 +274,7 @@ function AppShell() {
       reminder_info: data.reminder_info || null,
       share_info: data.share_info || {},
       links: data.links || [],
+      extra_notes: data.extra_notes || '',
     };
     updateMeta(targetKey, targetIndex, patch);
   }, [getTask, getTasksForDate, removeTask, updateMeta]);
@@ -228,6 +292,7 @@ function AppShell() {
       reminder_info: data.reminder_info || null,
       share_info: data.share_info || {},
       links: data.links || [],
+      extra_notes: data.extra_notes || '',
     };
     updateMeta(dateKey, idx, patch);
   }, [getTask, getTasksForDate, updateMeta]);
@@ -255,9 +320,14 @@ function AppShell() {
 
     const patch = { ...updatedData };
     if ('title' in patch && !('text' in patch)) { patch.text = patch.title; delete patch.title; }
+    if ('content' in patch && !('notes' in patch)) { patch.notes = patch.content; delete patch.content; }
     if ('repeat' in patch && !('repeat_info' in patch)) { patch.repeat_info = patch.repeat; delete patch.repeat; }
     if ('reminder' in patch && !('reminder_info' in patch)) { patch.reminder_info = patch.reminder; delete patch.reminder; }
     if ('share' in patch && !('share_info' in patch)) { patch.share_info = patch.share; delete patch.share; }
+
+    console.log('[App] handleUpdateTask - updatedData:', updatedData);
+    console.log('[App] handleUpdateTask - patch:', patch);
+    console.log('[App] handleUpdateTask - isSomeday:', p.type === 'someday');
 
     if (p.type === 'someday') {
       somedayApiRef.current?.updateSomedayMeta?.(p.columnId, p.rowIndex, patch);
@@ -305,30 +375,31 @@ function AppShell() {
   }, [activeTaskInfo, moveToDateHandler]);
 
   const handleMoveToSomeday = useCallback(() => {
-  if (!activeTaskInfo || activeTaskInfo.payload.type === 'someday') return;
-  const { dateKey, lineIdx } = activeTaskInfo.payload;
-  const data = getTask?.(dateKey, lineIdx) || {};
+    if (!activeTaskInfo || activeTaskInfo.payload.type === 'someday') return;
+    const { dateKey, lineIdx } = activeTaskInfo.payload;
+    const data = getTask?.(dateKey, lineIdx) || {};
 
-  const row = {
-    text: data.text || '',
-    notes: data.notes || '',
-    color: data.color || '',
-    subtasks: Array.isArray(data.subtasks) ? data.subtasks : [],
-    attachments: Array.isArray(data.attachments) ? data.attachments : [],
-    repeat_info: data.repeat_info || { type: 'never' },
-    reminder_info: data.reminder_info || null,
-    share_info: data.share_info || { enabled: false },
-    links: Array.isArray(data.links) ? data.links : [],
-    done: !!(data.done ?? data.is_done),
-    is_done: !!(data.done ?? data.is_done),
-  };
+    const row = {
+      text: data.text || '',
+      notes: data.notes || '',
+      color: data.color || '',
+      subtasks: Array.isArray(data.subtasks) ? data.subtasks : [],
+      attachments: Array.isArray(data.attachments) ? data.attachments : [],
+      repeat_info: data.repeat_info || { type: 'never' },
+      reminder_info: data.reminder_info || null,
+      share_info: data.share_info || { enabled: false },
+      links: Array.isArray(data.links) ? data.links : [],
+      extra_notes: data.extra_notes || '',
+      done: !!(data.done ?? data.is_done),
+      is_done: !!(data.done ?? data.is_done),
+    };
 
-  // ⬇️ gọi API tạo task bên Someday
-  somedayApiRef.current?.createSomedayTask?.(null, row, undefined);
+    // ⬇️ gọi API tạo task bên Someday
+    somedayApiRef.current?.createSomedayTask?.(null, row, undefined);
 
-  removeTask(dateKey, lineIdx);
-  closeTaskDetail();
- }, [activeTaskInfo, getTask, removeTask, closeTaskDetail]);
+    removeTask(dateKey, lineIdx);
+    closeTaskDetail();
+  }, [activeTaskInfo, getTask, removeTask, closeTaskDetail]);
 
 
   const handleDuplicate = useCallback(() => {
@@ -349,15 +420,16 @@ function AppShell() {
         reminder_info: data.reminder_info || null,
         share_info: data.share_info || { enabled: false },
         links: Array.isArray(data.links) ? data.links : [],
+        extra_notes: data.extra_notes || '',
       };
       // nếu SomedayProvider có API tạo hàng mới:
-       somedayApiRef.current?.createSomedayTask?.(p.columnId, row, p.rowIndex);
+      somedayApiRef.current?.createSomedayTask?.(p.columnId, row, p.rowIndex);
     } else {
       duplicateTaskLocal(p.dateKey, p.lineIdx);
     }
   }, [activeTaskInfo, duplicateTaskLocal]);
 
-  const handleAddAttachment = useCallback(() => {}, []);
+  const handleAddAttachment = useCallback(() => { }, []);
 
   // Khoá scroll nền khi có modal
   const anyModalOpen =
@@ -396,14 +468,33 @@ function AppShell() {
         onCreateCalendar={handleCreateCalendar}
       />
 
-      {/* ✅ dùng openTaskDetail để truyền cả payload + data */}
-      <CalendarGrid days={days} onOpenDetail={openTaskDetail} />
-      <SomedaySection
-           onOpenTask={openTaskDetail}
-           registerApi={(api) => { somedayApiRef.current = api; }}
-           authed={authed}
-          activeCalendarId={activeCalendarId}
-       />
+      {/* Main content - always show calendar and notes together when authenticated */}
+      {authChecked && authed && (
+        <>
+          <CalendarNotesGrid days={days} hideCompleted={settings.hideCompleted} />
+          <SomedaySection
+            key={days?.[0] ? keyOf(days[0]) : 'someday-section'}
+            weekKey={days?.[0] ? keyOf(days[0]) : ''}
+            onOpenTask={openTaskDetail}
+            registerApi={(api) => { somedayApiRef.current = api; }}
+            authed={authed}
+            activeCalendarId={activeCalendarId}
+          />
+        </>
+      )}
+
+      {authChecked && !authed && (
+        <div style={{ padding: '20px', textAlign: 'center' }}>
+          <p>Bạn cần đăng nhập để xem lịch và ghi chú.</p>
+          <button onClick={() => setShowAuth(true)}>Đăng nhập</button>
+        </div>
+      )}
+
+      {!authChecked && (
+        <div style={{ padding: '20px', textAlign: 'center' }}>
+          <p>Đang kiểm tra đăng nhập...</p>
+        </div>
+      )}
 
       {isSearchOpen && (
         <SearchModal
@@ -413,20 +504,21 @@ function AppShell() {
         />
       )}
 
-      <TaskModal
-        isOpen={!!activeTaskInfo}
-        task={activeTaskInfo?.data}
-        isSomeday={activeTaskInfo?.payload?.type === 'someday'}
-       
-        onClose={closeTaskDetail}
-        onUpdate={handleUpdateTask}
-        onDelete={handleDeleteTask}
-        onMoveToTomorrow={handleMoveToTomorrow}
-        onMoveToNextWeek={handleMoveToNextWeek}
-        onMoveToSomeday={handleMoveToSomeday}
-        onDuplicate={handleDuplicate}
-        onAddAttachment={handleAddAttachment}
-      />
+      {activeTaskInfo && (
+        <NoteEditor
+          note={{
+            ...activeTaskInfo.data,
+            title: activeTaskInfo.data.text || '',
+            content: activeTaskInfo.data.notes || '',
+            extra_notes: activeTaskInfo.data.extra_notes || '',
+            id: activeTaskInfo.data.id || Date.now()
+          }}
+          onSave={handleUpdateTask}
+          onDelete={handleDeleteTask}
+          onClose={closeTaskDetail}
+          isSomeday={activeTaskInfo?.payload?.type === 'someday'}
+        />
+      )}
 
       <AuthModal
         open={showAuth && !user}

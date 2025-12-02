@@ -11,5 +11,6 @@ router.get('/', ensureCalendar, t.listByRange);
 router.post('/', ensureCalendar, t.createDay);
 router.patch('/:id', ensureCalendar, t.update);
 router.delete('/:id', ensureCalendar, t.remove);
+router.post('/move-overdue', ensureCalendar, t.moveOverdue);
 
 module.exports = router;

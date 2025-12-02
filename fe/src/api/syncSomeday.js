@@ -1,10 +1,11 @@
 // fe/src/api/syncSomeday.js
 import * as Someday from './someday';
-import * as API from './index'; // để dùng storage.getToken/getActiveCalendarId nếu cần
+
+import * as storage from './storage'; // Avoid circular dependency with ./index
 
 function hasAuth() {
   try {
-    return !!API.storage.getToken() && !!API.storage.getActiveCalendarId();
+    return !!storage.getToken() && !!storage.getActiveCalendarId();
   } catch { return false; }
 }
 
@@ -13,28 +14,28 @@ export const syncSomeday = {
     return hasAuth();
   },
 
-  async pull(calendarId) {
+  async pull(calendarId, week = '') {
     if (!this.authed()) return [];
-    const cols = await Someday.board(calendarId);
+    const cols = await Someday.board(calendarId, week);
     return Array.isArray(cols) ? cols : [];
   },
 
-  async ensureThreeColumns(calendarId) {
+  async ensureThreeColumns(calendarId, week = '') {
     if (!this.authed()) return;
-    const cols = await this.pull(calendarId);
+    const cols = await this.pull(calendarId, week);
     if (cols.length > 0) return cols;
 
     // seed 3 cột rỗng trên server
-    await Someday.createColumn(calendarId, { title: '' });
-    await Someday.createColumn(calendarId, { title: '' });
-    await Someday.createColumn(calendarId, { title: '' });
-    return await this.pull(calendarId);
+    await Someday.createColumn(calendarId, { title: 'Lịch tuần', week_key: week });
+    await Someday.createColumn(calendarId, { title: '', week_key: week });
+    await Someday.createColumn(calendarId, { title: '', week_key: week });
+    return await this.pull(calendarId, week);
   },
 
   // ---- Columns
-  async createColumn(calendarId, title = '') {
+  async createColumn(calendarId, title = '', week = '') {
     if (!this.authed()) return null;
-    return await Someday.createColumn(calendarId, { title });
+    return await Someday.createColumn(calendarId, { title, week_key: week });
   },
   async renameColumn(calendarId, id, title) {
     if (!this.authed()) return;

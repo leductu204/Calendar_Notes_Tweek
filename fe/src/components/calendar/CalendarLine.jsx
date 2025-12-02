@@ -97,10 +97,6 @@ function CalendarLine({
         }}
       >
         <div className="task-content-wrapper">
-          <div className="task-status-icons">
-            {repeatInfo?.type !== 'never' && <RepeatIcon width={16} height={16} />}
-          </div>
-
           {hasChip ? (
             <div className="task-chip-wrap" style={{ width: '100%' }}>
               <div className="task-chip" style={chipStyle} onClick={openDetail}>

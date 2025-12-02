@@ -11,7 +11,7 @@ const STORAGE_KEY = (calId) => `someday_tasks_v2:${calId}`;
 const makeRow = () => ({
   id: null,
   text: '', hidden: false, done: false, color: '', notes: '',
-  subtasks: [], attachments: [], links: [], repeat_info: { type: 'never' },
+  subtasks: [], attachments: [], links: [], extra_notes: '', repeat_info: { type: 'never' },
   reminder_info: null, share_info: { enabled: false },
   modifiedAt: new Date().toISOString(),
 });
@@ -66,6 +66,7 @@ function mapServerBoard(serverCols = []) {
       subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
       attachments: Array.isArray(t.attachments) ? t.attachments : [],
       links: Array.isArray(t.links) ? t.links : [],
+      extra_notes: t.extra_notes || '',
       repeat_info: t.repeat_info || { type: 'never' },
       reminder_info: t.reminder_info || null,
       share_info: t.share_info || { enabled: false },
@@ -74,7 +75,7 @@ function mapServerBoard(serverCols = []) {
   }));
 }
 
-export default function SomedaySection({ onOpenTask, registerApi }) {
+export default function SomedaySection({ onOpenTask, registerApi, weekKey }) {
   const [calId, setCalId] = useState(getCalId());
   const [columns, setColumns] = useState(() => loadColumns(calId));
   const authed = !!API.storage.getToken?.() && !!API.storage.getActiveCalendarId?.();
@@ -128,7 +129,7 @@ export default function SomedaySection({ onOpenTask, registerApi }) {
     setCalId(id);
 
     if (syncSomeday.authed()) {
-      const cols = await syncSomeday.ensureThreeColumns(id);
+      const cols = await syncSomeday.ensureThreeColumns(id, weekKey);
       const mapped = doLayout(mapServerBoard(cols));
       setColumns(mapped);
       saveColumns(id, mapped); // cache offline
@@ -136,7 +137,7 @@ export default function SomedaySection({ onOpenTask, registerApi }) {
       const local = doLayout(loadColumns(id));
       setColumns(local);
     }
-  }, [doLayout]);
+  }, [doLayout, weekKey]);
 
   useEffect(() => {
     pullBoard(); // lần đầu
@@ -176,6 +177,7 @@ export default function SomedaySection({ onOpenTask, registerApi }) {
         subtasks: Array.isArray(row?.subtasks) ? row.subtasks : [],
         attachments: Array.isArray(row?.attachments) ? row.attachments : [],
         links: Array.isArray(row?.links) ? row.links : [],
+        extra_notes: row?.extra_notes || '',
         repeat_info: row?.repeat_info || { type: 'never' },
         reminder_info: row?.reminder_info || null,
         share_info: row?.share_info || { enabled: false },
@@ -205,6 +207,7 @@ export default function SomedaySection({ onOpenTask, registerApi }) {
         subtasks: Array.isArray(row?.subtasks) ? row.subtasks : [],
         attachments: Array.isArray(row?.attachments) ? row.attachments : [],
         links: Array.isArray(row?.links) ? row.links : [],
+        extra_notes: row?.extra_notes || '',
         repeat_info: row?.repeat_info || { type: 'never' },
         reminder_info: row?.reminder_info || null,
         share_info: row?.share_info || { enabled: false },
@@ -233,6 +236,7 @@ export default function SomedaySection({ onOpenTask, registerApi }) {
         repeat: task.repeat_info || { type: 'never' },
         reminder: task.reminder_info || null,
         links: Array.isArray(task.links) ? task.links : [],
+        extra_notes: task.extra_notes || '',
       }]);
 
       c.tasks.splice(rowIndex, 1);
@@ -266,6 +270,7 @@ export default function SomedaySection({ onOpenTask, registerApi }) {
         done: doneFromPatch !== undefined ? !!doneFromPatch : t.done,
         color: colorFromPatch !== undefined ? colorFromPatch : t.color,
         notes: patch.notes !== undefined ? patch.notes : (t.notes || ''),
+        extra_notes: patch.extra_notes !== undefined ? patch.extra_notes : (t.extra_notes || ''),
         modifiedAt: new Date().toISOString(),
       };
 
@@ -283,13 +288,30 @@ export default function SomedaySection({ onOpenTask, registerApi }) {
 
     // sync server
     const row = columns.find(c => String(c.id) === String(columnId))?.tasks?.[rowIndex];
+    
+    console.log('[SomedaySection] updateSomedayMeta - row:', row);
+    console.log('[SomedaySection] updateSomedayMeta - row?.id:', row?.id);
+    console.log('[SomedaySection] updateSomedayMeta - syncSomeday.authed():', syncSomeday.authed());
+    
     if (syncSomeday.authed() && row?.id) {
       const patchSrv = {};
       if (patch.title != null || patch.text != null) patchSrv.text = patch.title ?? patch.text ?? '';
       if (patch.notes != null) patchSrv.notes = patch.notes ?? '';
       if (patch.color != null) patchSrv.color = patch.color ?? '';
       if (patch.done != null || patch.completed != null) patchSrv.is_done = !!(patch.done ?? patch.completed);
+      if (patch.extra_notes != null) patchSrv.extra_notes = patch.extra_notes ?? '';
+
+      console.log('[SomedaySection] updateSomedayMeta - patch:', patch);
+      console.log('[SomedaySection] updateSomedayMeta - patchSrv:', patchSrv);
+      console.log('[SomedaySection] Calling syncSomeday.updateTask with:', { calId, taskId: String(row.id), patchSrv });
+
       await syncSomeday.updateTask(calId, String(row.id), patchSrv);
+    } else {
+      console.warn('[SomedaySection] NOT calling API because:', {
+        authed: syncSomeday.authed(),
+        hasRowId: !!row?.id,
+        row
+      });
     }
   }, [columns, calId, doLayout, addRowAll]);
 
@@ -373,6 +395,76 @@ export default function SomedaySection({ onOpenTask, registerApi }) {
     });
   }, [doLayout, addRowAll, calId]);
 
+// Temporary file to hold handleCommit function
+const handleCommit = useCallback(async (columnId, rowIndex) => {
+  console.log('[SomedaySection] handleCommit triggered:', columnId, rowIndex);
+  
+  const col = columns.find(c => String(c.id) === String(columnId));
+  const task = col?.tasks?.[rowIndex];
+  
+  if (!task) {
+    console.log('[SomedaySection] Task not found for commit');
+    return;
+  }
+
+  if (!syncSomeday.authed()) {
+    console.log('[SomedaySection] Not authenticated, skipping sync');
+    return;
+  }
+
+  if (!calId) {
+    console.error('[SomedaySection] Missing calId in handleCommit');
+    return;
+  }
+
+  // If task has an ID, update it
+  if (task.id) {
+    console.log('[SomedaySection] Updating existing task:', task.id, task.text);
+    try {
+      await syncSomeday.updateTask(calId, String(task.id), { text: task.text });
+    } catch (e) {
+      console.error('Failed to update someday task on commit:', e);
+    }
+  } 
+  // If task has text but no ID, create it
+  else if (task.text && task.text.trim()) {
+    console.log('[SomedaySection] Creating new task for text:', task.text);
+    try {
+      const created = await syncSomeday.createTask(calId, String(columnId), {
+        text: task.text,
+        is_done: !!task.done,
+        color: task.color || '',
+        notes: task.notes || '',
+        subtasks: task.subtasks || [],
+        attachments: task.attachments || [],
+        links: task.links || [],
+        extra_notes: task.extra_notes || '',
+        repeat_info: task.repeat_info || { type: 'never' },
+        reminder_info: task.reminder_info || null,
+        share_info: task.share_info || { enabled: false },
+      });
+
+      if (created && created.id) {
+        console.log('[SomedaySection] Task created successfully:', created.id);
+        // Update local state with the new ID
+        setColumns(prev => {
+          const next = cloneCols(prev);
+          const c = next.find(x => String(x.id) === String(columnId));
+          if (c && c.tasks[rowIndex]) {
+            c.tasks[rowIndex].id = String(created.id);
+          }
+          return next;
+        });
+      }
+    } catch (e) {
+      console.error('Failed to create someday task on commit:', e);
+    }
+  } else {
+    console.log('[SomedaySection] No text to save and no ID, skipping');
+  }
+}, [columns, calId]);
+
+
   const onToggleDone = useCallback((columnId, rowIndex) => {
     setColumns(prev => {
       const working = cloneCols(prev);
@@ -405,7 +497,7 @@ export default function SomedaySection({ onOpenTask, registerApi }) {
   const addColumn = useCallback(async (index) => {
     // nếu login: tạo cột trên server trước để lấy id thật
     if (syncSomeday.authed()) {
-      const created = await syncSomeday.createColumn(calId, '');
+      const created = await syncSomeday.createColumn(calId, '', weekKey);
       await pullBoard();
       return;
     }
@@ -462,6 +554,7 @@ export default function SomedaySection({ onOpenTask, registerApi }) {
             index={index}
             minRows={MIN_ROWS}
             onUpdate={handleUpdate}
+            onCommit={handleCommit}
             onToggleDone={onToggleDone}
             onAddColumn={addColumn}
             onDeleteColumn={deleteColumnCb}

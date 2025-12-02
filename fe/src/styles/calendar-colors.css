@@ -1,0 +1,14 @@
+/* Calendar Note Button Colors - All 12 Colors */
+.calendar-note-button[data-color="rose"] { background: #ffe4e6 !important; border-color: #f43f5e !important; }
+.calendar-note-button[data-color="orange"] { background: #ffedd5 !important; border-color: #fb923c !important; }
+.calendar-note-button[data-color="yellow"] { background: #fef9c3 !important; border-color: #facc15 !important; }
+.calendar-note-button[data-color="lime"] { background: #ecfccb !important; border-color: #84cc16 !important; }
+.calendar-note-button[data-color="green"] { background: #dcfce7 !important; border-color: #22c55e !important; }
+.calendar-note-button[data-color="teal"] { background: #ccfbf1 !important; border-color: #14b8a6 !important; }
+.calendar-note-button[data-color="blue"] { background: #dbeafe !important; border-color: #3b82f6 !important; }
+.calendar-note-button[data-color="indigo"] { background: #e0e7ff !important; border-color: #6366f1 !important; }
+.calendar-note-button[data-color="violet"] { background: #ede9fe !important; border-color: #8b5cf6 !important; }
+.calendar-note-button[data-color="pink"] { background: #fce7f3 !important; border-color: #ec4899 !important; }
+.calendar-note-button[data-color="slate"] { background: #f1f5f9 !important; border-color: #64748b !important; }
+.calendar-note-button[data-color="brown"] { background: #efebe9 !important; border-color: #a1887f !important; }
+.calendar-note-button[data-color="white"] { background: #ffffff !important; border-color: #e5e7eb !important; }

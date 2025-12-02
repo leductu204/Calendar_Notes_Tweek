@@ -20,6 +20,9 @@ router.post('/login',    authController.login);
 // NEW: bootstrap phiên sau F5
 router.get('/me', authMiddleware, authController.me);
 
+// Google OAuth routes - disabled until credentials are configured
+// Uncomment these routes after setting GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env
+/*
 console.log('[authRoutes] registering GET /google');
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
@@ -33,5 +36,6 @@ router.get(
     res.redirect(`${FRONTEND_APP_URL}?token=${encodeURIComponent(token)}&user=${encodeURIComponent(userResponse)}`);
   }
 );
+*/
 
 module.exports = router;

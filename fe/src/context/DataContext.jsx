@@ -113,6 +113,7 @@ export function DataProvider({ children }) {
           repeat_info: patch?.repeat_info ?? cur.repeat_info ?? { type: 'never' },
           reminder_info: patch?.reminder_info ?? cur.reminder_info ?? null,
           links: patch?.links ?? cur.links ?? [],
+          extra_notes: patch?.extra_notes ?? cur.extra_notes ?? '',
         });
         list[lineIdx] = created || { ...cur, ...patch, text: textNext };
         setDay(dateKey, list);

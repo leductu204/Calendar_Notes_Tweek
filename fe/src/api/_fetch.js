@@ -3,9 +3,9 @@ import * as storage from './storage';
 
 let API_BASE_URL = 'http://localhost:4000';
 try {
-  if (import.meta && import.meta.env && import.meta.env.VITE_API_BASE_URL) {
-    API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-  } else if (typeof window !== 'undefined' && window.location && window.location.port === '5173') {
+  if (import.meta && import.meta.env && (import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_BASE_URL)) {
+    API_BASE_URL = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_BASE_URL;
+  } else if (typeof window !== 'undefined' && window.location && (window.location.port === '5173' || window.location.port === '5174')) {
     API_BASE_URL = 'http://localhost:4000';
   } else if (typeof window !== 'undefined' && window.location) {
     API_BASE_URL = window.location.origin;
@@ -22,6 +22,10 @@ function getToken() {
 function getActiveCalendarId() {
   return storage.getActiveCalendarId();
 }
+
+// Add a simple request cache to prevent duplicate requests
+const requestCache = new Map();
+const CACHE_DURATION = 1000; // 1 second
 
 export async function apiFetch(endpoint, { method = 'GET', headers = {}, body } = {}) {
   const token = getToken();

@@ -1,6 +1,7 @@
-// FE: fe/src/components/modals/TaskModal.jsx
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+// FE: fe/src/components/modals/TaskModal.jsx - Simplified version without note-taking
+import React, { useEffect, useState } from "react";
 import "../../styles/task.css";
+import "../../styles/notes.css";
 
 import DatePickerPopover from "./popovers/DatePickerPopover.jsx";
 import RepeatPopover from "./popovers/RepeatPopover.jsx";
@@ -48,21 +49,6 @@ const IcoCheck = () => (
     <path d="M20 6L9 17l-5-5" />
   </svg>
 );
-const IcoListBullet = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-    <line x1="8" y1="12" x2="21" y2="12"></line>
-    <line x1="8" y1="6" x2="21" y2="6"></line>
-    <line x1="8" y1="18" x2="21" y2="18"></line>
-    <line x1="3" y1="12" x2="3.01" y2="12"></line>
-    <line x1="3" y1="6" x2="3.01" y2="6"></line>
-    <line x1="3" y1="18" x2="3.01" y2="18"></line>
-  </svg>
-);
-const IcoBlockquote = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-    <path d="M3 12h18M3 6h18M3 18h18" />
-  </svg>
-);
 
 /* ===== Helpers ===== */
 function fmtDateVN(d) {
@@ -70,47 +56,6 @@ function fmtDateVN(d) {
   const dt = new Date(d);
   const dow = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][dt.getDay()];
   return `${dow}, ${dt.getDate()}/${dt.getMonth() + 1}/${dt.getFullYear()}`;
-}
-
-/* contentEditable helpers */
-function placeCaretAtBlock(block, atEnd = true) {
-  if (!block) return;
-  const r = document.createRange();
-  r.selectNodeContents(block);
-  r.collapse(!atEnd);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(r);
-}
-function ensureOneEmptyParagraph(host) {
-  if (!host) return;
-  host.innerHTML = "<p><br/></p>";
-  const p = host.querySelector("p");
-  placeCaretAtBlock(p, false);
-}
-function ensureHostHasBlock(host) {
-  if (!host) return;
-  const hasBlock = host.querySelector("p,div,li");
-  if (!hasBlock && host.textContent.trim() === "") ensureOneEmptyParagraph(host);
-}
-function getOrCreateCurrentBlock(host, focusHost = true) {
-  if (!host) return null;
-  ensureHostHasBlock(host);
-  const sel = window.getSelection();
-  const inside = sel && sel.rangeCount > 0 && host.contains(sel.anchorNode);
-
-  if (!inside) {
-    if (!focusHost) return host.querySelector("p,div,li");
-    host.focus();
-    const first = host.querySelector("p,div,li");
-    if (first) placeCaretAtBlock(first, false);
-  }
-
-  const range = window.getSelection().getRangeAt(0);
-  let node = range.startContainer;
-  if (node.nodeType === 3) node = node.parentElement;
-  while (node && node !== host && !/^(P|DIV|LI)$/i.test(node.tagName)) node = node.parentElement;
-  return node && node !== host ? node : host.querySelector("p,div,li");
 }
 
 /* Popover layer */
@@ -161,21 +106,14 @@ export default function TaskModal({
   onAddAttachment,
   isSomeday
 }) {
-  const notesEl = useRef(null);
   const t = task || {};
 
-  /* ===== ÉP KIỂU AN TOÀN ===== */
+  /* ===== SAFE TYPE COERCION ===== */
   const subtasksArr = Array.isArray(t.subtasks)
     ? t.subtasks
     : (t.subtasks && typeof t.subtasks === "object" ? Object.values(t.subtasks) : []);
   const attachmentsArr = Array.isArray(t.attachments) ? t.attachments : [];
   const linksArr = Array.isArray(t.links) ? t.links : [];
-
-  // toolbar
-  const [hOn, setHOn] = useState(false);
-  const [bOn, setBOn] = useState(false);
-  const [quoteOn, setQuoteOn] = useState(false);
-  const [bulletOn, setBulletOn] = useState(false);
 
   // links panel
   const [localLinks, setLocalLinks] = useState(linksArr);
@@ -197,18 +135,8 @@ export default function TaskModal({
     return () => document.body.classList.remove("modal-open");
   }, [isOpen]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!isOpen) return;
-    const el = notesEl.current; if (!el) return;
-
-    const notes = t.notes || "";
-    if (notes && !/<[a-z]/i.test(notes)) el.textContent = notes;
-    else el.innerHTML = notes || "";
-    if (!notes || notes.trim() === "") ensureHostHasBlock(el);
-
-    const plain = (el.innerText || "").replace(/\u200B/g, "").trim();
-    el.dataset.hastext = plain ? "1" : "";
-
     const safeLinks = linksArr;
     setLocalLinks(safeLinks);
     setLinkOpen(safeLinks.length > 0);
@@ -216,20 +144,7 @@ export default function TaskModal({
     setLinkVal("");
     setOpenPop(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, t?.id]); // reset khi mở task khác
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = () => {
-      const blk = getOrCreateCurrentBlock(notesEl.current, false);
-      setHOn(!!blk?.classList.contains("hline"));
-      setQuoteOn(!!blk?.classList.contains("quote-line"));
-      try { setBOn(document.queryCommandState("bold")); } catch {}
-      setBulletOn(!!blk && blk.tagName === "LI");
-    };
-    document.addEventListener("selectionchange", handler);
-    return () => document.removeEventListener("selectionchange", handler);
-  }, [isOpen]);
+  }, [isOpen, t?.id]); // reset when opening different task
 
   if (!isOpen) return null;
 
@@ -238,70 +153,6 @@ export default function TaskModal({
     const b = e.currentTarget.getBoundingClientRect();
     setAnchor({ top: b.bottom + 8, left: b.left + b.width / 2 });
     setOpenPop(key);
-  };
-
-  const syncNotes = () => {
-    const el = notesEl.current; if (!el) return;
-    onUpdate?.({ notes: el.innerHTML || "" });
-    const plain = (el.innerText || "").replace(/\u200B/g, "").trim();
-    el.dataset.hastext = plain ? "1" : "";
-  };
-
-  const toggleH = () => {
-    const blk = getOrCreateCurrentBlock(notesEl.current, true); if (!blk) return;
-    blk.classList.toggle("hline");
-    setHOn(blk.classList.contains("hline"));
-    syncNotes();
-  };
-  const toggleBold = () => {
-    const host = notesEl.current; host?.focus();
-    document.execCommand("bold");
-    try { setBOn(document.queryCommandState("bold")); } catch {}
-    syncNotes();
-  };
-  const toggleQuote = () => {
-    const host = notesEl.current;
-    const blk = getOrCreateCurrentBlock(host, true); if (!blk) return;
-    const willOn = !blk.classList.contains("quote-line");
-    if (willOn) {
-      if (blk.tagName === "LI") document.execCommand("insertUnorderedList");
-      blk.classList.add("quote-line");
-    } else {
-      blk.classList.remove("quote-line");
-    }
-    setQuoteOn(blk.classList.contains("quote-line"));
-    const cur = getOrCreateCurrentBlock(host, false);
-    setBulletOn(!!cur && cur.tagName === "LI");
-    syncNotes();
-  };
-  const toggleBullet = () => {
-    const host = notesEl.current; host?.focus();
-    const blkBefore = getOrCreateCurrentBlock(host, false);
-    if (blkBefore?.classList.contains("quote-line")) {
-      blkBefore.classList.remove("quote-line");
-      setQuoteOn(false);
-    }
-    document.execCommand("insertUnorderedList");
-    const blk = getOrCreateCurrentBlock(host, false);
-    setBulletOn(!!blk && blk.tagName === "LI");
-    syncNotes();
-  };
-
-  const handleNotesKeyDown = (e) => {
-    if (e.key !== "Enter") return;
-    const el = notesEl.current; if (!el) return;
-    const blk = getOrCreateCurrentBlock(el, false); if (!blk) return;
-    const isLast = blk === Array.from(el.querySelectorAll("p,div,li")).pop();
-    const carryH = blk.classList.contains("hline");
-    const carryQ = blk.classList.contains("quote-line");
-    setTimeout(() => {
-      const nb = getOrCreateCurrentBlock(el, false); if (!nb) return;
-      if (isLast) {
-        if (carryH) nb.classList.add("hline");
-        if (carryQ) nb.classList.add("quote-line");
-      }
-      syncNotes();
-    }, 0);
   };
 
   const normalizeUrl = (raw) => {
@@ -330,6 +181,7 @@ export default function TaskModal({
     setLinkVal("");
     setIsAddingLink(false);
   };
+  
   const removeLink = (idx, e) => {
     e?.preventDefault(); e?.stopPropagation();
     const next = (localLinks || []).filter((_, i) => i !== idx);
@@ -338,8 +190,6 @@ export default function TaskModal({
   };
 
   const handleClose = () => {
-    const patch = {};
-    if (notesEl.current) patch.notes = notesEl.current.innerHTML || "";
     let nextLinks = localLinks;
     const pending = (linkVal || "").trim();
     if (pending) {
@@ -347,8 +197,7 @@ export default function TaskModal({
       if (url && !nextLinks.includes(url)) nextLinks = [...nextLinks, url];
       setLocalLinks(nextLinks);
     }
-    patch.links = nextLinks;
-    onUpdate?.(patch);
+    onUpdate?.({ links: nextLinks });
     setIsAddingLink(false);
     setLinkVal("");
     setOpenPop(null);
@@ -370,6 +219,7 @@ export default function TaskModal({
     });
     setAdderText("");
   };
+  
   const updateSubtask = (id, idx, patch) => {
     const next = subtasksArr.map((s, i) => {
       const match = (s?.id != null) ? (s.id === id) : (i === idx);
@@ -377,6 +227,7 @@ export default function TaskModal({
     });
     onUpdate?.({ subtasks: next });
   };
+  
   const deleteSubtask = (id, idx) => {
     const next = subtasksArr.filter((s, i) => {
       const match = (s?.id != null) ? (s.id === id) : (i === idx);
@@ -392,210 +243,186 @@ export default function TaskModal({
     onUpdate?.({ attachments: [...attachmentsArr, meta] });
     onAddAttachment?.([file]);
   };
+  
   const removeAttachment = (id) => {
     onUpdate?.({ attachments: attachmentsArr.filter((a) => a.id !== id) });
   };
 
   /* Render */
   return (
-    <div
-      className="modal-overlay task-overlay"
-      onMouseDown={handleClose}
-      style={{ background: "var(--overlay-bg, rgba(0,0,0,.35))", backdropFilter: "blur(1px)" }}
-    >
-      <div className="task-modal" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="note-editor-overlay" onClick={handleClose}>
+      <div className="note-editor-optimized" data-color={t.color || ''} onMouseDown={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="task-modal__head">
-          {!isSomeday && (
-            <button className="date-btn" onClick={(e) => openAt(e, "date")} title="Chọn ngày">
-              <span className="date-ic"><IcoCalendar /></span>{fmtDateVN(t.date)}
-            </button>
-          )}
-          <div className="head-icons" style={{ marginLeft: 'auto' }}>
-            <button className="ico" title="Xoá" onClick={onDelete}><IcoTrash /></button>
+        <div className="note-editor-header-opt">
+          <div></div> {/* Empty div to replace date display */}
+          
+          <div className="actions-opt">
+            <button className="icon-btn" title="Xoá" onClick={onDelete}><IcoTrash /></button>
             {!isSomeday && (
-              <button className="ico" title="Lặp lại" onClick={(e) => openAt(e, "repeat")}><IcoRepeat /></button>
+              <button className="icon-btn" title="Lặp lại" onClick={(e) => openAt(e, "repeat")}><IcoRepeat /></button>
             )}
             <button
-              className={`ico-color ${t.color ? "has-color" : ""}`}
+              className={`icon-btn ico-color ${t.color ? "has-color" : ""}`}
               title="Màu"
               onClick={(e) => openAt(e, "color")}
               style={t.color ? { "--swatch": t.color } : {}}
             >
               <span className="sw" />
             </button>
-            <button className="ico" title="Nhắc nhở" onClick={(e) => openAt(e, "reminder")}><IcoBell /></button>
-            <button className="ico" title="Chia sẻ" onClick={(e) => openAt(e, "share")}><IcoShare /></button>
-            <button className="ico" title="Thêm tuỳ chọn" onClick={(e) => openAt(e, "kebab")}><IcoMore /></button>
+            <button className="icon-btn" title="Nhắc nhở" onClick={(e) => openAt(e, "reminder")}><IcoBell /></button>
+            <button className="icon-btn" title="Chia sẻ" onClick={(e) => openAt(e, "share")}><IcoShare /></button>
+            <button className="icon-btn" title="Thêm tuỳ chọn" onClick={(e) => openAt(e, "kebab")}><IcoMore /></button>
           </div>
         </div>
 
         {/* Title */}
-        <div className="title-wrapper">
-          <input
-            autoFocus
-            className="task-title-input"
-            value={t.text || ""}
-            onChange={(e) => onUpdate?.({ text: e.target.value })}
-            placeholder="Tiêu đề công việc"
-          />
-          <button
-            className={`title-check-btn ${(t.done ?? t.is_done) ? 'is-done' : ''}`}
-            title="Đánh dấu hoàn thành"
-            onClick={handleToggleDoneAndClose}
-          >
-            <IcoCheck />
-          </button>
-        </div>
+        <input
+          autoFocus
+          type="text"
+          className="note-title-opt"
+          value={t.text || ""}
+          onChange={(e) => onUpdate?.({ text: e.target.value })}
+          placeholder="Tiêu đề công việc"
+        />
 
-        <div className="rule-strong" />
+        {/* Content Area */}
+        <div className="note-content-opt">
+          <div className="rule-strong" />
 
-        {/* Notes toolbar */}
-        <div className="notes-toolbar">
-          <button className={`tb ${hOn ? "on" : ""}`} title="Tiêu đề (phóng to + đậm)" onClick={toggleH}>H</button>
-          <button className={`tb ${bOn ? "on" : ""}`} title="In đậm" onClick={toggleBold}>B</button>
-          <button className={`tb icon ${bulletOn ? "on" : ""}`} title="Gạch đầu dòng (•)" onClick={toggleBullet}><IcoListBullet/></button>
-          <button className={`tb icon ${quoteOn ? "on" : ""}`} title="Trích dẫn (vạch xám)" onClick={toggleQuote}><IcoBlockquote/></button>
-          <button className="tb" title="Mở/đóng & hiển thị ô chèn" onClick={toggleLinkPanel}>🔗</button>
-        </div>
+          {/* Links panel */}
+          <div style={{ marginBottom: 16 }}>
+            <button className="tb" title="Quản lý liên kết" onClick={toggleLinkPanel}>🔗 Liên kết</button>
+            {linkOpen && (
+              <div className="links-panel" style={{ marginTop: 8, display: "grid", gap: 8 }} onMouseDown={(e)=>e.stopPropagation()}>
+                {(localLinks || []).map((u, idx) => (
+                  <div key={idx} className="link-wrap" style={{ position: "relative" }}>
+                    <input
+                      className="link-input"
+                      value={u}
+                      readOnly
+                      style={{
+                        width: "100%",
+                        padding: "10px 148px 10px 12px",
+                        border: "1.5px solid #0a0a0a",
+                        borderRadius: 12,
+                        background: "var(--task-card)",
+                        fontSize: 16,
+                        outline: "none",
+                        color: "var(--task-text)"
+                      }}
+                    />
+                    <div style={{ position: "absolute", right: 8, top: 6, display: "flex", gap: 6 }}>
+                      <a
+                        href={u}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          height: 32, padding: "0 12px",
+                          border: "1.5px solid #0a0a0a",
+                          borderRadius: 10,
+                          background: "var(--task-card)",
+                          display: "inline-flex", alignItems: "center", fontWeight: 800
+                        }}
+                        onMouseDown={(e)=>e.stopPropagation()}
+                      >Mở</a>
+                      <button
+                        onClick={(e) => removeLink(idx, e)}
+                        style={{
+                          height: 32, padding: "0 12px",
+                          border: "1.5px solid #0a0a0a",
+                          borderRadius: 10,
+                          background: "var(--task-card)",
+                          fontWeight: 800, cursor: "pointer"
+                        }}
+                        onMouseDown={(e)=>e.stopPropagation()}
+                      >Xóa</button>
+                    </div>
+                  </div>
+                ))}
 
-        {/* Links panel */}
-        {linkOpen && (
-          <div className="links-panel" style={{ marginTop: 8, display: "grid", gap: 8 }} onMouseDown={(e)=>e.stopPropagation()}>
-            {(localLinks || []).map((u, idx) => (
-              <div key={idx} className="link-wrap" style={{ position: "relative" }}>
-                <input
-                  className="link-input"
-                  value={u}
-                  readOnly
-                  style={{
-                    width: "100%",
-                    padding: "10px 148px 10px 12px",
-                    border: "1.5px solid #0a0a0a",
-                    borderRadius: 12,
-                    background: "var(--task-card)",
-                    fontSize: 16,
-                    outline: "none",
-                    color: "var(--task-text)"
-                  }}
-                />
-                <div style={{ position: "absolute", right: 8, top: 6, display: "flex", gap: 6 }}>
-                  <a
-                    href={u}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      height: 32, padding: "0 12px",
-                      border: "1.5px solid #0a0a0a",
-                      borderRadius: 10,
-                      background: "var(--task-card)",
-                      display: "inline-flex", alignItems: "center", fontWeight: 800
-                    }}
-                    onMouseDown={(e)=>e.stopPropagation()}
-                  >Mở</a>
-                  <button
-                    onClick={(e) => removeLink(idx, e)}
-                    style={{
-                      height: 32, padding: "0 12px",
-                      border: "1.5px solid #0a0a0a",
-                      borderRadius: 10,
-                      background: "var(--task-card)",
-                      fontWeight: 800, cursor: "pointer"
-                    }}
-                    onMouseDown={(e)=>e.stopPropagation()}
-                  >Xóa</button>
-                </div>
-              </div>
-            ))}
-
-            {isAddingLink && (
-              <div className="link-wrap" style={{ position: "relative" }}>
-                <input
-                  id="link-box-input"
-                  type="text"
-                  value={linkVal}
-                  onChange={(e) => setLinkVal(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addLink(e); } }}
-                  placeholder="www.example.com"
-                  className="link-input"
-                  style={{
-                    width: "100%",
-                    padding: "10px 84px 10px 12px",
-                    border: "1.5px solid #0a0a0a",
-                    borderRadius: 12,
-                    background: "var(--task-card)",
-                    fontSize: 16,
-                    outline: "none",
-                    color: "var(--task-text)"
-                  }}
-                />
-                <button
-                  onClick={(e) => addLink(e)}
-                  className="link-btn"
-                  style={{
-                    position: "absolute", right: 8, top: 6,
-                    height: 32, padding: "0 12px",
-                    border: "1.5px solid #0a0a0a",
-                    background: "var(--task-card)",
-                    borderRadius: 10, fontWeight: 800, cursor: "pointer"
-                  }}
-                  onMouseDown={(e)=>e.stopPropagation()}
-                >Chèn</button>
+                {isAddingLink && (
+                  <div className="link-wrap" style={{ position: "relative" }}>
+                    <input
+                      id="link-box-input"
+                      type="text"
+                      value={linkVal}
+                      onChange={(e) => setLinkVal(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addLink(e); } }}
+                      placeholder="www.example.com"
+                      className="link-input"
+                      style={{
+                        width: "100%",
+                        padding: "10px 84px 10px 12px",
+                        border: "1.5px solid #0a0a0a",
+                        borderRadius: 12,
+                        background: "var(--task-card)",
+                        fontSize: 16,
+                        outline: "none",
+                        color: "var(--task-text)"
+                      }}
+                    />
+                    <button
+                      onClick={(e) => addLink(e)}
+                      className="link-btn"
+                      style={{
+                        position: "absolute", right: 8, top: 6,
+                        height: 32, padding: "0 12px",
+                        border: "1.5px solid #0a0a0a",
+                        background: "var(--task-card)",
+                        borderRadius: 10, fontWeight: 800, cursor: "pointer"
+                      }}
+                      onMouseDown={(e)=>e.stopPropagation()}
+                    >Chèn</button>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
 
-        {/* Notes area */}
-        <div
-          ref={notesEl}
-          className="task-notes"
-          contentEditable
-          suppressContentEditableWarning
-          spellCheck={false}
-          data-placeholder="Thêm ghi chú ở đây"
-          onInput={syncNotes}
-          onPaste={(e) => {
-            e.preventDefault();
-            const text = (e.clipboardData || window.clipboardData).getData("text");
-            document.execCommand("insertText", false, text);
-          }}
-          onFocus={() => ensureHostHasBlock(notesEl.current)}
-          onKeyDown={handleNotesKeyDown}
-        />
+          {/* Subtasks */}
+          <div className="subtasks">
+            {subtasksArr.map((s, idx) => {
+              const safe = {
+                id: s?.id ?? undefined,
+                text: s?.text ?? "",
+                done: !!s?.done,
+                starred: !!s?.starred,
+                heading: !!s?.heading,
+                indent: Number.isFinite(s?.indent) ? s.indent : 0,
+              };
+              const key = safe.id != null ? `id-${safe.id}` : `idx-${idx}`;
+              return (
+                <SubtaskItem
+                  key={key}
+                  data={safe}
+                  onChange={(patch) => updateSubtask(safe.id, idx, patch)}
+                  onDelete={() => deleteSubtask(safe.id, idx)}
+                />
+              );
+            })}
+          </div>
 
-        {/* Subtasks */}
-        <div className="subtasks">
-          {subtasksArr.map((s, idx) => {
-            const safe = {
-              id: s?.id ?? undefined,
-              text: s?.text ?? "",
-              done: !!s?.done,
-              starred: !!s?.starred,
-              heading: !!s?.heading,
-              indent: Number.isFinite(s?.indent) ? s.indent : 0,
-            };
-            const key = safe.id != null ? `id-${safe.id}` : `idx-${idx}`;
-            return (
-              <SubtaskItem
-                key={key}
-                data={safe}
-                onChange={(patch) => updateSubtask(safe.id, idx, patch)}
-                onDelete={() => deleteSubtask(safe.id, idx)}
-              />
-            );
-          })}
+          {attachmentsArr.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {attachmentsArr.map((a) => (
+                <AttachmentItem key={a.id} file={a} onDelete={() => removeAttachment(a.id)} />
+              ))}
+            </div>
+          )}
+        </div>
 
-          <div className="subtasks__adder">
+        {/* Footer */}
+        <div className="note-footer-opt">
+          <div className="subtask-input-wrapper">
             <div className="circle" />
             <input
-              className="adder-input"
+              className="subtask-input"
               placeholder="Thêm nhiệm vụ phụ…"
               value={adderText}
               onChange={(e) => setAdderText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddSubtask(); } }}
             />
-            <label className="attach-btn" title="Thêm tệp">
+            <label className="attach-btn" title="Thêm tệp" style={{ cursor: 'pointer' }}>
               🔗
               <input
                 type="file"
@@ -609,14 +436,6 @@ export default function TaskModal({
             </label>
           </div>
         </div>
-
-        {attachmentsArr.length > 0 && (
-          <div style={{ marginTop: 10 }}>
-            {attachmentsArr.map((a) => (
-              <AttachmentItem key={a.id} file={a} onDelete={() => removeAttachment(a.id)} />
-            ))}
-          </div>
-        )}
 
         {/* Popovers */}
         {openPop === "date" && !isSomeday && (

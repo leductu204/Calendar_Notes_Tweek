@@ -1,0 +1,102 @@
+
+/* Color Grid and Swatches for Optimized Note Editor */
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.color-swatch-opt {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: transform 0.1s;
+}
+
+.color-swatch-opt:hover {
+  transform: scale(1.1);
+}
+
+.color-swatch-opt[data-color="rose"] { background: #f43f5e; }
+.color-swatch-opt[data-color="orange"] { background: #fb923c; }
+.color-swatch-opt[data-color="yellow"] { background: #facc15; }
+.color-swatch-opt[data-color="lime"] { background: #84cc16; }
+.color-swatch-opt[data-color="green"] { background: #22c55e; }
+.color-swatch-opt[data-color="teal"] { background: #14b8a6; }
+.color-swatch-opt[data-color="blue"] { background: #3b82f6; }
+.color-swatch-opt[data-color="indigo"] { background: #6366f1; }
+.color-swatch-opt[data-color="violet"] { background: #8b5cf6; }
+.color-swatch-opt[data-color="pink"] { background: #ec4899; }
+.color-swatch-opt[data-color="slate"] { background: #64748b; }
+.color-swatch-opt[data-color="brown"] { background: #a1887f; }
+.color-swatch-opt[data-color="white"] { background: #ffffff; border: 1px solid #e5e7eb; color: #111; }
+.color-swatch-opt[data-color="red"] { background: #ef4444; }
+.color-swatch-opt[data-color="amber"] { background: #f59e0b; }
+.color-swatch-opt[data-color="emerald"] { background: #10b981; }
+.color-swatch-opt[data-color="cyan"] { background: #06b6d4; }
+.color-swatch-opt[data-color="sky"] { background: #0ea5e9; }
+.color-swatch-opt[data-color="purple"] { background: #a855f7; }
+.color-swatch-opt[data-color="fuchsia"] { background: #d946ef; }
+.color-swatch-opt[data-color="gray"] { background: #6b7280; }
+
+.premium-label {
+  text-align: center;
+  font-size: 12px;
+  color: #6b7280;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.note-title-opt {
+  font-size: 28px;
+  font-weight: 700;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 10px 24px;
+  width: 100%;
+  color: #111;
+}
+
+.note-title-opt::placeholder {
+  color: #111;
+  opacity: 1;
+}
+
+.formatting-toolbar-opt {
+  display: flex;
+  gap: 16px;
+  padding: 0 24px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Color Preview Circle (shows selected color in header) */
+.color-circle-preview[data-color="rose"] { background: #f43f5e; }
+.color-circle-preview[data-color="orange"] { background: #fb923c; }
+.color-circle-preview[data-color="yellow"] { background: #facc15; }
+.color-circle-preview[data-color="lime"] { background: #84cc16; }
+.color-circle-preview[data-color="green"] { background: #22c55e; }
+.color-circle-preview[data-color="teal"] { background: #14b8a6; }
+.color-circle-preview[data-color="blue"] { background: #3b82f6; }
+.color-circle-preview[data-color="indigo"] { background: #6366f1; }
+.color-circle-preview[data-color="violet"] { background: #8b5cf6; }
+.color-circle-preview[data-color="pink"] { background: #ec4899; }
+.color-circle-preview[data-color="slate"] { background: #64748b; }
+.color-circle-preview[data-color="brown"] { background: #a1887f; }
+.color-circle-preview[data-color="white"] { background: #ffffff; border: 1px solid #e5e7eb; }
+.color-circle-preview[data-color="red"] { background: #ef4444; }
+.color-circle-preview[data-color="amber"] { background: #f59e0b; }
+.color-circle-preview[data-color="emerald"] { background: #10b981; }
+.color-circle-preview[data-color="cyan"] { background: #06b6d4; }
+.color-circle-preview[data-color="sky"] { background: #0ea5e9; }
+.color-circle-preview[data-color="purple"] { background: #a855f7; }
+.color-circle-preview[data-color="fuchsia"] { background: #d946ef; }
+.color-circle-preview[data-color="gray"] { background: #6b7280; }

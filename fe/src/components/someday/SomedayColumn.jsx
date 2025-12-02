@@ -81,6 +81,10 @@ function SomedayColumn({
       repeat: task.repeat_info || task.repeat,
       reminder: task.reminder_info || task.reminder,
       share: task.share_info || task.share,
+      subtasks: task.subtasks || [],
+      attachments: task.attachments || [],
+      links: task.links || [],
+      extra_notes: task.extra_notes || '',
     });
   };
 
@@ -246,11 +250,6 @@ function SomedayColumn({
                 onDoubleClick={() => { if (hasText) openDetail(rowIndex); }}
               >
                 <div className="task-content-wrapper">
-                  <div className="task-status-icons">
-                    {rep && rep.type !== 'never' && <RepeatIcon width={16} height={16} />}
-                    {rem && <BellIcon width={16} height={16} />}
-                    {shr && shr.enabled && <UserPlusIcon width={16} height={16} />}
-                  </div>
                   <input
                     ref={(el) => (inputRefs.current[rowIndex] = el)}
                     type="text"

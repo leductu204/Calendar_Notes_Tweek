@@ -1,8 +1,10 @@
 // fe/src/api/tasks.js
+import * as storage from './storage';
+
 const API_BASE = (import.meta.env?.VITE_API_BASE) || 'http://localhost:4000';
 
 function authHeaders() {
-  const t = localStorage.getItem('auth_token');
+  const t = storage.getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
@@ -47,4 +49,14 @@ export async function deleteTask(calendarId, taskId) {
   });
   if (!res.ok && res.status !== 204) throw new Error('deleteTask failed');
   return true;
+}
+
+export async function moveOverdueToToday(calendarId, today) {
+  const res = await fetch(`${API_BASE}/api/tasks/move-overdue`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ calendarId: Number(calendarId), today }),
+  });
+  if (!res.ok) throw new Error('moveOverdueToToday failed');
+  return res.json();
 }

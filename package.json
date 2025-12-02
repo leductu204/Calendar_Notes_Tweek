@@ -1,0 +1,16 @@
+{
+  "name": "ghichu1-root",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:be\" \"npm run dev:fe\"",
+    "dev:be": "cd be && npm run dev",
+    "dev:fe": "cd fe && npm run dev",
+    "install:all": "npm install && cd be && npm install && cd ../fe && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  }
+}
